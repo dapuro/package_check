@@ -81,6 +81,22 @@ _build_script_file() {
 
 }
 
+_lxc_container_is_used() {
+  [[ $NO_LXC -eq 0 ]]
+}
+
+_lxc_container_domain() {
+  local -r container_name=$1
+
+  sudo cat /var/lib/lxc/$container_name/rootfs/etc/yunohost/current_host
+}
+
+_ynh_domain() {
+  sudo yunohost domain list -l 1 \
+    | cut -d" " -f 2 \
+    | echo
+}
+
 # FUNCTIONS
 
 usage() {
@@ -442,22 +458,25 @@ main() {
   DOMAIN=$( find_and_store_config_value "DOMAIN" "Domain to be tested" )
 
   main_iface=$( find_and_store_iface_config_value "iface" "The name of the network interface" )
+
+  if _lxc_container_is_used; then
+	  DOMAIN=$( _lxc_container_domain $LXC_NAME )
+  else
+	  DOMAIN=$( _ynh_domain )
+  fi
+
+  SOUS_DOMAIN="sous.$DOMAIN"
 }
 
 main
+
+exit 0
 
 ### REFACTORED END ###
 
 # Récupère les informations depuis le fichier de conf (Ou le complète le cas échéant)
 pcheck_config="$script_dir/config"
 
-if [ "$no_lxc" -eq 0 ]
-then
-	DOMAIN=$(sudo cat /var/lib/lxc/$LXC_NAME/rootfs/etc/yunohost/current_host)
-else
-	DOMAIN=$(sudo yunohost domain list -l 1 | cut -d" " -f 2)
-fi
-SOUS_DOMAIN="sous.$DOMAIN"
 
 if [ "$no_lxc" -eq 0 ]
 then	# Si le conteneur lxc est utilisé
