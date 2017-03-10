@@ -24,6 +24,7 @@ LXC_NAME=""
 LXC_BRIDGE=""
 YUNO_PWD=""
 DOMAIN=""
+main_iface=""
 
 # HELPER FUNCTIONS
 
@@ -394,6 +395,28 @@ find_and_store_config_value() {
   echo $result
 }
 
+find_and_store_iface_config_value() {
+  local -r key=$1
+  local -r config_comment=$2
+  local result=$( _get_value_from_config_file $key )
+
+  if is_empty $result; then
+    # FIXME: do we need a sudo here?
+    result=$( route \
+      | grep default \
+      | awk '{print $8;}' 
+    )
+  fi
+  if is_empty $result; then
+    ECHO_FORMAT  "Unable to determine the name of the host's network interface." "red"
+    exit 1
+  else
+    _write_to_config_file $key $result "${config_comment}"
+  fi
+
+  echo $result
+}
+
 main() {
   parse_options_and_arguments
   set_script_dir
@@ -414,10 +437,11 @@ main() {
 
   YUNO_PWD=$( find_and_store_config_value "YUNO_PWD" "The Yunohost admin password" )
   
-  # FIXME: Do we need this? Domain is updated in lcx block further below? How come?
+  # FIXME: DOMAIN is updated in lcx block further below. Do we still need this?
   #
   DOMAIN=$( find_and_store_config_value "DOMAIN" "Domain to be tested" )
 
+  main_iface=$( find_and_store_iface_config_value "iface" "The name of the network interface" )
 }
 
 main
@@ -426,23 +450,6 @@ main
 
 # Récupère les informations depuis le fichier de conf (Ou le complète le cas échéant)
 pcheck_config="$script_dir/config"
-# Tente de lire les informations depuis le fichier de config si il existe
-if [ -e "$pcheck_config" ]
-then
-	main_iface=$(cat "$pcheck_config" | grep iface= | cut -d '=' -f2)
-fi
-# Utilise des valeurs par défaut si les variables sont vides, et génère le fichier de config
-
-if [ -z "$main_iface" ]; then
-	# Tente de définir l'interface réseau principale
-	main_iface=$(sudo route | grep default | awk '{print $8;}')	# Prend l'interface réseau défini par default
-	if [ -z $main_iface ]; then
-		echo -e "\e[91mImpossible de déterminer le nom de l'interface réseau de l'hôte.\e[0m"
-		exit 1
-	fi
-	# Enregistre le nom de l'interface réseau de l'hôte dans un fichier de config
-	echo -e "# Interface réseau principale de l'hôte\niface=$main_iface\n" >> "$pcheck_config"
-fi
 
 if [ "$no_lxc" -eq 0 ]
 then
