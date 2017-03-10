@@ -15,6 +15,10 @@ build_lxc=0
 force_install_ok=0
 script_dir=""
 
+USER_TEST=package_checker
+PASSWORD_TEST=checker_pwd
+PATH_TEST=/check
+
 # HELPER FUNCTIONS
 
 file_exists() {
@@ -329,10 +333,6 @@ main() {
 main
 
 ### REFACTORED END ###
-
-USER_TEST=package_checker
-PASSWORD_TEST=checker_pwd
-PATH_TEST=/check
 
 # Récupère les informations depuis le fichier de conf (Ou le complète le cas échéant)
 pcheck_config="$script_dir/config"
