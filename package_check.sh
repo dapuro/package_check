@@ -148,29 +148,39 @@ ensure_user_can_execute_sript() {
   fi
 }
 
+ensure_internet_connection_is_working() {
+  local result=1
+  local domain=''
+
+  for domain in $@
+  do
+    ping -q -c 2 $domain > /dev/null 2>&1
+    if [ "$?" -eq 0 ]; then
+      result=0
+      break
+    fi
+  done
+  if [ $result -eq 1 ]; then
+    ECHO_FORMAT "Unable to establish a connection to the internet.\n" "red"
+    exit 1
+  fi
+}
+
 main() {
   parse_options_and_arguments
   set_script_dir
   ensure_user_can_execute_sript
+
+  source "$script_dir/sub_scripts/lxc_launcher.sh"
+  source "$script_dir/sub_scripts/testing_process.sh"
+  source /usr/share/yunohost/helpers
+
+  ensure_internet_connection_is_working "yunohost.org" "framasoft.org"
 }
 
 main
 
 ### REFACTORED END ###
-
-source "$script_dir/sub_scripts/lxc_launcher.sh"
-source "$script_dir/sub_scripts/testing_process.sh"
-source /usr/share/yunohost/helpers
-
-# Vérifie la connexion internet.
-ping -q -c 2 yunohost.org > /dev/null 2>&1
-if [ "$?" -ne 0 ]; then	# En cas d'échec de connexion, tente de pinger un autre domaine pour être sûr
-	ping -q -c 2 framasoft.org > /dev/null 2>&1
-	if [ "$?" -ne 0 ]; then	# En cas de nouvel échec de connexion. On considère que la connexion est down...
-		ECHO_FORMAT "Impossible d'établir une connexion à internet.\n" "red"
-		exit 1
-	fi
-fi
 
 if test -e "$script_dir/pcheck.lock"
 then	# Présence du lock, Package check ne peut pas continuer.
