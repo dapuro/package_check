@@ -15,6 +15,18 @@ build_lxc=0
 force_install_ok=0
 script_dir=""
 
+# HELPER FUNCTIONS
+
+file_exists() {
+  local file=$1
+
+  [[ -e $file ]]
+}
+
+_setup_user_file() {
+  echo "$script_dir/sub_scripts/setup_user"
+}
+
 # FUNCTIONS
 
 usage() {
@@ -119,21 +131,34 @@ set_script_dir() {
   fi
 }
 
+ensure_user_can_execute_sript() {
+  local -r file=$( _setup_user_file )
+  local current_user=""
+  local setup_user=""
+
+  if file_exists $file; then
+    current_user=$( whoami )
+    setup_user=$( cat $file )
+
+    if [ $current_user != $setup_user ]; then
+      echo -e "\e[91mScript must be executed with the user $setup_user!\nThe current user is $current_user."
+      echo -en "\e[0m"
+      exit 0
+    fi
+  fi
+}
+
 main() {
   parse_options_and_arguments
   set_script_dir
+  ensure_user_can_execute_sript
 }
 
 main
 
 ### REFACTORED END ###
 
-# Check user
-if [ "$(whoami)" != "$(cat "$script_dir/sub_scripts/setup_user")" ] && test -e "$script_dir/sub_scripts/setup_user"; then
-	echo -e "\e[91mCe script doit être exécuté avec l'utilisateur $(cat "$script_dir/sub_scripts/setup_user") !\nL'utilisateur actuel est $(whoami)."
-	echo -en "\e[0m"
-	exit 0
-fi
+exit
 
 source "$script_dir/sub_scripts/lxc_launcher.sh"
 source "$script_dir/sub_scripts/testing_process.sh"
