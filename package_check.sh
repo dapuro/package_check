@@ -43,6 +43,17 @@ _package_check_version_file() {
 	 echo "$script_dir/package_version"
 }
 
+_package_linter_repo() {
+	 echo "https://github.com/YunoHost/package_linter"
+}
+
+_package_linter_version_file() {
+	 echo "$script_dir/plinter_version"
+}
+
+_package_linter_dir() {
+	 echo "$script_dir/package_linter"
+}
 # FUNCTIONS
 
 usage() {
@@ -260,6 +271,46 @@ ensure_package_check_is_up_to_date() {
   echo $remote_version > $local_version_file
 }
 
+_upgrade_package_linter() {
+  local -r repo_url=$1
+  local -r target_dir=$2
+  local -r tmp_dir=$( mktemp --directory )
+
+  ECHO_FORMAT "Updating package_linter..." "white" "bold"
+
+  git clone --quiet $repo_url $tmp_dir
+  cp --archive $tmp_dir $target_dir 
+  rm --recursive --force $tmp_dir
+}
+
+_install_package_linter() {
+  local repo_url=$1
+  local target_dir=$2
+
+  ECHO_FORMAT "Installing package_linter.\n" "white"
+
+  git clone --quiet $repo_url $target_dir
+}
+
+ensure_package_linter_is_up_to_date() {
+  local -r repo_url=$( _package_linter_repo )
+  local -r local_version_file=$( _package_linter_version_file )
+  local -r target_dir=$( _package_linter_dir )
+  local -r remote_version=$( _get_git_repo_remote_version $repo_url )
+  local local_version=""
+
+  if file_exists $local_version_file; then
+    local_version=$( cat $local_version_file )
+
+    if [ $remote_version != $local_version ]; then      
+      _upgrade_package_linter $repo_url $target_dir
+    fi
+  else
+    _install_package_linter $repo_url $target_dir
+  fi
+  echo $remote_version > $local_version_file
+}
+
 main() {
   parse_options_and_arguments
   set_script_dir
@@ -272,27 +323,12 @@ main() {
   ensure_internet_connection_is_working "yunohost.org" "framasoft.org"
   ensure_no_other_process_is_executing_script $bash_mode
   ensure_package_check_is_up_to_date
+  ensure_package_linter_is_up_to_date
 }
 
 main
 
 ### REFACTORED END ###
-
-version_plinter="$(git ls-remote https://github.com/YunoHost/package_linter | cut -f 1 | head -n1)"
-if [ -e "$script_dir/plinter_version" ]
-then
-	if [ "$version_plinter" != "$(cat "$script_dir/plinter_version")" ]; then	# Si le dernier commit sur github ne correspond pas au commit enregistré, il y a une mise à jour.
-		ECHO_FORMAT "Mise à jour de package_linter..." "white" "bold"
-		git clone --quiet https://github.com/YunoHost/package_linter "$script_dir/package_linter_tmp"
-		sudo cp -a "$script_dir/package_linter_tmp/." "$script_dir/package_linter/."
-		sudo rm -r "$script_dir/package_linter_tmp"
-	fi
-else	# Si le fichier de version n'existe pas, il est créé.
-	echo "$version_plinter" > "$script_dir/plinter_version"
-	ECHO_FORMAT "Installation de package_linter.\n" "white"
-	git clone --quiet https://github.com/YunoHost/package_linter "$script_dir/package_linter"
-fi
-echo "$version_plinter" > "$script_dir/plinter_version"
 
 USER_TEST=package_checker
 PASSWORD_TEST=checker_pwd
