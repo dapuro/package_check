@@ -19,12 +19,24 @@ USER_TEST=package_checker
 PASSWORD_TEST=checker_pwd
 PATH_TEST=/check
 
+PLAGE_IP=""
+LXC_NAME=""
+LXC_BRIDGE=""
+YUNO_PWD=""
+DOMAIN=""
+
 # HELPER FUNCTIONS
 
 file_exists() {
   local file=$1
 
   [[ -e $file ]]
+}
+
+is_empty() {
+  local var=$1
+
+  [[ -z $var ]]
 }
 
 _setup_user_file() {
@@ -58,6 +70,16 @@ _package_linter_version_file() {
 _package_linter_dir() {
 	 echo "$script_dir/package_linter"
 }
+
+_config_file() {
+	 echo "$script_dir/config"
+}
+
+_build_script_file() {
+	 echo "$script_dir/sub_scripts/lxc_build.sh"
+
+}
+
 # FUNCTIONS
 
 usage() {
@@ -315,6 +337,63 @@ ensure_package_linter_is_up_to_date() {
   echo $remote_version > $local_version_file
 }
 
+_get_value_from_config_file() {
+  local -r file=$( _config_file )
+  local -r key=$1
+  local result=""
+
+  if file_exists $file; then
+    result=$( cat $file \
+        | grep "${key}=" \
+        | cut -d '=' -f2
+      )
+  fi
+  echo $result
+}
+
+_get_value_from_build_script_file() {
+  local -r file=$( _build_script_file )
+  local -r key=$1
+  local result=""
+
+  if file_exists $file; then
+    if [ $key = "PLAGE_IP" ]; then
+      result=$( cat $file \
+          | grep "|| ${key}=" \
+          | cut -d '"' -f4
+        )
+    else
+      result=$( cat $file \
+          | grep "|| ${key}=" \
+          | cut -d '=' -f2
+        )
+    fi
+  fi
+  echo $result
+}
+
+_write_to_config_file() {
+  local config_file=$( _config_file )
+  local key=$1
+  local value=$2
+  local comment=$3
+
+	echo -e "# $comment \n${key}=${value}\n" >> $config_file
+}
+
+find_and_store_config_value() {
+  local -r key=$1
+  local -r config_comment=$2
+  local result=$( _get_value_from_config_file $key )
+
+  if is_empty $result; then
+    result=$( _get_value_from_build_script_file $key )
+    _write_to_config_file $key $result "${config_comment}"
+  fi
+
+  echo $result
+}
+
 main() {
   parse_options_and_arguments
   set_script_dir
@@ -328,6 +407,17 @@ main() {
   ensure_no_other_process_is_executing_script $bash_mode
   ensure_package_check_is_up_to_date
   ensure_package_linter_is_up_to_date
+
+  PLAGE_IP=$( find_and_store_config_value "PLAGE_IP" "Public IP of LXC container" )
+  LXC_NAME=$( find_and_store_config_value "LXC_NAME" "LXC container name" )
+  LXC_BRIDGE=$( find_and_store_config_value "LXC_BRIDGE" "The LXC bridge name" )
+
+  YUNO_PWD=$( find_and_store_config_value "YUNO_PWD" "The Yunohost admin password" )
+  
+  # FIXME: Do we need this? Domain is updated in lcx block further below? How come?
+  #
+  DOMAIN=$( find_and_store_config_value "DOMAIN" "Domain to be tested" )
+
 }
 
 main
@@ -339,34 +429,10 @@ pcheck_config="$script_dir/config"
 # Tente de lire les informations depuis le fichier de config si il existe
 if [ -e "$pcheck_config" ]
 then
-	PLAGE_IP=$(cat "$pcheck_config" | grep PLAGE_IP= | cut -d '=' -f2)
-	DOMAIN=$(cat "$pcheck_config" | grep DOMAIN= | cut -d '=' -f2)
-	YUNO_PWD=$(cat "$pcheck_config" | grep YUNO_PWD= | cut -d '=' -f2)
-	LXC_NAME=$(cat "$pcheck_config" | grep LXC_NAME= | cut -d '=' -f2)
-	LXC_BRIDGE=$(cat "$pcheck_config" | grep LXC_BRIDGE= | cut -d '=' -f2)
 	main_iface=$(cat "$pcheck_config" | grep iface= | cut -d '=' -f2)
 fi
 # Utilise des valeurs par défaut si les variables sont vides, et génère le fichier de config
-if [ -z "$PLAGE_IP" ]; then
-	PLAGE_IP=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| PLAGE_IP=" | cut -d '"' -f4)
-	echo -e "# Plage IP du conteneur\nPLAGE_IP=$PLAGE_IP\n" >> "$pcheck_config"
-fi
-if [ -z "$DOMAIN" ]; then
-	DOMAIN=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| DOMAIN=" | cut -d '=' -f2)
-	echo -e "# Domaine de test\nDOMAIN=$DOMAIN\n" >> "$pcheck_config"
-fi
-if [ -z "$YUNO_PWD" ]; then
-	YUNO_PWD=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| YUNO_PWD=" | cut -d '=' -f2)
-	echo -e "# Mot de passe\nYUNO_PWD=$YUNO_PWD\n" >> "$pcheck_config"
-fi
-if [ -z "$LXC_NAME" ]; then
-	LXC_NAME=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| LXC_NAME=" | cut -d '=' -f2)
-	echo -e "# Nom du conteneur\nLXC_NAME=$LXC_NAME\n" >> "$pcheck_config"
-fi
-if [ -z "$LXC_BRIDGE" ]; then
-	LXC_BRIDGE=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep "|| LXC_BRIDGE=" | cut -d '=' -f2)
-	echo -e "# Nom du bridge\nLXC_BRIDGE=$LXC_BRIDGE\n" >> "$pcheck_config"
-fi
+
 if [ -z "$main_iface" ]; then
 	# Tente de définir l'interface réseau principale
 	main_iface=$(sudo route | grep default | awk '{print $8;}')	# Prend l'interface réseau défini par default
