@@ -158,8 +158,6 @@ main
 
 ### REFACTORED END ###
 
-exit
-
 source "$script_dir/sub_scripts/lxc_launcher.sh"
 source "$script_dir/sub_scripts/testing_process.sh"
 source /usr/share/yunohost/helpers
