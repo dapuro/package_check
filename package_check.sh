@@ -15,8 +15,9 @@ build_lxc=0
 force_install_ok=0
 script_dir=""
 
-USER_TEST=package_checker
-PASSWORD_TEST=checker_pwd
+USER_TEST="package_checker"
+USER_TEST_CLEAN=""
+PASSWORD_TEST="checker_pwd"
 PATH_TEST=/check
 
 PLAGE_IP=""
@@ -426,8 +427,7 @@ find_and_store_iface_config_value() {
 
 _ynh_domain() {
   sudo yunohost domain list -l 1 \
-    | cut -d" " -f 2 \
-    | echo
+    | cut -d" " -f 2 
 }
 
 _remove_process_lock() {
@@ -436,7 +436,7 @@ _remove_process_lock() {
 }
 
 lxc_container_is_used() {
-  [[ $NO_LXC -eq 0 ]]
+  [[ $no_lxc -eq 0 ]]
 }
 
 _lxc_installed() {
@@ -471,6 +471,39 @@ ensure_lxc_container_setup() {
 	fi
 }
 
+find_or_create_test_user() {
+  local -r test_user=$1
+  local -r domain=$2
+  local -r password=$3
+  local test_user_cleaned=""
+  local mail=""
+  local firstname=""
+  local lastname=""
+
+	echo -e "\nCheck if test user exists ..."
+
+	if ! ynh_user_exists $test_user; then
+
+    # Remove underscores
+		test_user_cleaned=${test_user//"_"/""}
+
+    # FIXME: do we really need this global variable?
+    USER_TEST_CLEAN="${test_user_cleaned}"
+
+    firstname="${test_user_cleaned}"
+    lastname="${test_user_cleaned}"
+    mail="${test_user_cleaned}@${domain}"
+
+		sudo yunohost user create --firstname $firstname  --lastname $lastname --mail $mail --password $password $test_user
+
+		if [ "$?" -ne 0 ]; then
+			ECHO_FORMAT "Test user could not be created. Can not continue ... \n" "red"
+      _remove_process_lock
+			exit 1
+		fi
+	fi
+}
+
 main() {
   parse_options_and_arguments
   set_script_dir
@@ -498,6 +531,7 @@ main() {
 
   if lxc_container_is_used; then
 	  DOMAIN=$( _lxc_container_domain $LXC_NAME )
+
     ensure_lxc_container_setup $LXC_NAME $BUILD_LXC
 
     # Stops any eventual activity of the container, in the event of a previously incorrect shutdown
@@ -505,6 +539,8 @@ main() {
     LXC_TURNOFF
   else
 	  DOMAIN=$( _ynh_domain )
+
+    find_or_create_test_user $USER_TEST $DOMAIN $PASSWORD_TEST
   fi
 
   SOUS_DOMAIN="sous.$DOMAIN"
@@ -522,30 +558,6 @@ if [ "$no_lxc" -eq 0 ]
 then	# Si le conteneur lxc est utilisé
   echo ""
 else	# Vérifie l'utilisateur et le domain si lxc n'est pas utilisé.
-	# Vérifie l'existence de l'utilisateur de test
-	echo -e "\nVérification de l'existence de l'utilisateur de test..."
-	if ! ynh_user_exists "$USER_TEST"
-	then	# Si il n'existe pas, il faut le créer.
-		USER_TEST_CLEAN=${USER_TEST//"_"/""}
-		sudo yunohost user create --firstname "$USER_TEST_CLEAN" --mail "$USER_TEST_CLEAN@$DOMAIN" --lastname "$USER_TEST_CLEAN" --password "$PASSWORD_TEST" "$USER_TEST"
-		if [ "$?" -ne 0 ]; then
-			ECHO_FORMAT "La création de l'utilisateur de test a échoué. Impossible de continuer.\n" "red"
-			sudo rm "$script_dir/pcheck.lock" # Retire le lock
-			exit 1
-		fi
-	fi
-
-	# Vérifie l'existence du sous-domaine de test
-	echo "Vérification de l'existence du domaine de test..."
-	if [ "$(sudo yunohost domain list | grep -c "$SOUS_DOMAIN")" -eq 0 ]; then	# Si il n'existe pas, il faut le créer.
-		sudo yunohost domain add "$SOUS_DOMAIN"
-		if [ "$?" -ne 0 ]; then
-			ECHO_FORMAT "La création du sous-domain de test a échoué. Impossible de continuer.\n" "red"
-			sudo rm "$script_dir/pcheck.lock" # Retire le lock
-			exit 1
-		fi
-	fi
-fi
 
 # Vérifie le type d'emplacement du package à tester
 echo "Récupération du package à tester."
