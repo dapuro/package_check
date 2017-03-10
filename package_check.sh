@@ -81,20 +81,11 @@ _build_script_file() {
 
 }
 
-_lxc_container_is_used() {
-  [[ $NO_LXC -eq 0 ]]
-}
 
 _lxc_container_domain() {
   local -r container_name=$1
 
   sudo cat /var/lib/lxc/$container_name/rootfs/etc/yunohost/current_host
-}
-
-_ynh_domain() {
-  sudo yunohost domain list -l 1 \
-    | cut -d" " -f 2 \
-    | echo
 }
 
 # FUNCTIONS
@@ -433,6 +424,53 @@ find_and_store_iface_config_value() {
   echo $result
 }
 
+_ynh_domain() {
+  sudo yunohost domain list -l 1 \
+    | cut -d" " -f 2 \
+    | echo
+}
+
+_remove_process_lock() {
+  # FIXME: do we need sudo here?
+  sudo rm $( _process_lock_file )
+}
+
+lxc_container_is_used() {
+  [[ $NO_LXC -eq 0 ]]
+}
+
+_lxc_installed() {
+  dpkg-query --show --showformat='${Status}' "lxc" 2>/dev/null \
+    | grep -q "ok installed";
+}
+
+_lxc_container_exists() {
+  local name=$1
+
+  sudo lxc-ls | grep -q $name
+}
+
+ensure_lxc_container_setup() {
+  local -r name=$1
+  local -r build_lxc=$2
+  local -r build_script_file=$( _build_script_file )
+
+  if _lxc_installed && _lxc_container_exists $name; then
+    echo "lxc container $container_name is up and running. nothing to do."
+  else
+		if [ $build_lxc -eq 1 ]
+		then
+			exec $build_script_file
+		else
+      ECHO_FORMAT "Lxc is not installed, or the container  $container_name does not exist.\n" "red"
+			ECHO_FORMAT "Use the 'lxc_build.sh' script to install lxc and create the machine.\n" "red"
+			ECHO_FORMAT "Or use the optional parameter --no-lxc\n" "red"
+      _remove_process_lock
+			exit 1
+		fi
+	fi
+}
+
 main() {
   parse_options_and_arguments
   set_script_dir
@@ -454,13 +492,17 @@ main() {
   YUNO_PWD=$( find_and_store_config_value "YUNO_PWD" "The Yunohost admin password" )
   
   # FIXME: DOMAIN is updated in lcx block further below. Do we still need this?
-  #
   DOMAIN=$( find_and_store_config_value "DOMAIN" "Domain to be tested" )
 
   main_iface=$( find_and_store_iface_config_value "iface" "The name of the network interface" )
 
-  if _lxc_container_is_used; then
+  if lxc_container_is_used; then
 	  DOMAIN=$( _lxc_container_domain $LXC_NAME )
+    ensure_lxc_container_setup $LXC_NAME $BUILD_LXC
+
+    # Stops any eventual activity of the container, in the event of a previously incorrect shutdown
+    LXC_STOP
+    LXC_TURNOFF
   else
 	  DOMAIN=$( _ynh_domain )
   fi
@@ -470,8 +512,6 @@ main() {
 
 main
 
-exit 0
-
 ### REFACTORED END ###
 
 # Récupère les informations depuis le fichier de conf (Ou le complète le cas échéant)
@@ -480,29 +520,7 @@ pcheck_config="$script_dir/config"
 
 if [ "$no_lxc" -eq 0 ]
 then	# Si le conteneur lxc est utilisé
-	lxc_ok=0
-	# Vérifie la présence du virtualisateur en conteneur LXC
-	if dpkg-query -W -f '${Status}' "lxc" 2>/dev/null | grep -q "ok installed"; then
-		if sudo lxc-ls | grep -q "$LXC_NAME"; then	# Si lxc est installé, vérifie la présence de la machine $LXC_NAME
-			lxc_ok=1
-		fi
-	fi
-	if [ "$lxc_ok" -eq 0 ]
-	then
-		if [ "$build_lxc" -eq 1 ]
-		then
-			"$script_dir/sub_scripts/lxc_build.sh"	# Lance la construction de la machine virtualisée.
-		else
-			ECHO_FORMAT "Lxc n'est pas installé, ou la machine $LXC_NAME n'est pas créée.\n" "red"
-			ECHO_FORMAT "Utilisez le script 'lxc_build.sh' pour installer lxc et créer la machine.\n" "red"
-			ECHO_FORMAT "Ou utilisez l'argument --no-lxc\n" "red"
-			sudo rm "$script_dir/pcheck.lock" # Retire le lock
-			exit 1
-		fi
-	fi
-	# Stoppe toute activité éventuelle du conteneur, en cas d'arrêt incorrect précédemment
-	LXC_STOP
-	LXC_TURNOFF
+  echo ""
 else	# Vérifie l'utilisateur et le domain si lxc n'est pas utilisé.
 	# Vérifie l'existence de l'utilisateur de test
 	echo -e "\nVérification de l'existence de l'utilisateur de test..."
