@@ -27,6 +27,10 @@ _setup_user_file() {
   echo "$script_dir/sub_scripts/setup_user"
 }
 
+_process_lock_file() { 
+  echo "$script_dir/pcheck.lock"
+}
+
 # FUNCTIONS
 
 usage() {
@@ -166,6 +170,32 @@ ensure_internet_connection_is_working() {
   fi
 }
 
+ensure_no_other_process_is_executing_script() {
+  local -r lock=$( _process_lock_file )
+  local -r auto_confirm=$1
+  local rep="N"
+
+  if file_exists $lock; then
+    echo "The process lock ${lock} exists. Package Check seems already in use."
+
+    if [ $auto_confirm -ne 1 ]; then
+      echo -n "Do you want to continue anyway and ignore the lock? (Y/N) :"
+      read rep
+    fi
+    
+    case ${rep:0:1} in
+      Y|y|O|o) 
+              # nothing to do
+              ;;
+            *)
+              echo "The execution of Package Check is canceled!"
+              exit 0
+              ;;
+    esac
+  fi
+  touch $lock
+}
+
 main() {
   parse_options_and_arguments
   set_script_dir
@@ -176,27 +206,12 @@ main() {
   source /usr/share/yunohost/helpers
 
   ensure_internet_connection_is_working "yunohost.org" "framasoft.org"
+  ensure_no_other_process_is_executing_script $bash_mode
 }
 
 main
 
 ### REFACTORED END ###
-
-if test -e "$script_dir/pcheck.lock"
-then	# Présence du lock, Package check ne peut pas continuer.
-	echo "Le fichier $script_dir/pcheck.lock est présent. Package check est déjà utilisé."
-	rep="N"
-	if [ "$bash_mode" -ne 1 ]; then
-		echo -n "Souhaitez-vous continuer quand même et ignorer le lock ? (Y/N) :"
-		read rep
-	fi
-	if [ "${rep:0:1}" != "Y" ] && [ "${rep:0:1}" != "y" ] && [ "${rep:0:1}" != "O" ] && [ "${rep:0:1}" != "o" ]
-	then	# Teste uniquement le premier caractère de la réponse pour continuer malgré le lock.
-		echo "L'exécution de Package check est annulée"
-		exit 0
-	fi
-fi
-touch "$script_dir/pcheck.lock" # Met en place le lock de Package check
 
 version_script="$(git ls-remote https://github.com/YunoHost/package_check | cut -f 1 | head -n1)"
 if [ -e "$script_dir/package_version" ]
