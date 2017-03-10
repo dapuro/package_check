@@ -26,6 +26,7 @@ LXC_BRIDGE=""
 YUNO_PWD=""
 DOMAIN=""
 main_iface=""
+SOUS_DOMAIN=""
 
 # HELPER FUNCTIONS
 
@@ -504,6 +505,38 @@ find_or_create_test_user() {
 	fi
 }
 
+_ynh_domain_exists() {
+  local -r domain=$1
+  local result=1
+
+  result=$( sudo yunohost domain list | grep --count $domain )
+  [[ $result -ne 0 ]]
+}
+
+_ynh_create_domain() {
+  local -r domain=$1
+  local result=1
+
+  sudo yunohost domain add $domain
+
+  result=$?
+  [[ $result -eq 0 ]]
+}
+
+ensure_subdomain_exists() {
+  local -r subdomain=$1
+
+	echo "Checking if domain for test exists ..."
+
+	if ! _ynh_domain_exists $subdomain ; then
+
+		if ! _ynh_create_domain $subdomain; then
+			ECHO_FORMAT "The creation of the subdomain for the test failed. Can not continue ... \n" "red"
+      _remove_process_lock
+			exit 1
+		fi
+	fi
+}
 main() {
   parse_options_and_arguments
   set_script_dir
@@ -531,6 +564,7 @@ main() {
 
   if lxc_container_is_used; then
 	  DOMAIN=$( _lxc_container_domain $LXC_NAME )
+    SOUS_DOMAIN="sous.$DOMAIN"
 
     ensure_lxc_container_setup $LXC_NAME $BUILD_LXC
 
@@ -539,11 +573,10 @@ main() {
     LXC_TURNOFF
   else
 	  DOMAIN=$( _ynh_domain )
-
+    SOUS_DOMAIN="sous.$DOMAIN"
     find_or_create_test_user $USER_TEST $DOMAIN $PASSWORD_TEST
+    ensure_subdomain_exists $SOUS_DOMAIN
   fi
-
-  SOUS_DOMAIN="sous.$DOMAIN"
 }
 
 main
@@ -552,12 +585,6 @@ main
 
 # Récupère les informations depuis le fichier de conf (Ou le complète le cas échéant)
 pcheck_config="$script_dir/config"
-
-
-if [ "$no_lxc" -eq 0 ]
-then	# Si le conteneur lxc est utilisé
-  echo ""
-else	# Vérifie l'utilisateur et le domain si lxc n'est pas utilisé.
 
 # Vérifie le type d'emplacement du package à tester
 echo "Récupération du package à tester."
