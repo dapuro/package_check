@@ -31,6 +31,18 @@ _process_lock_file() {
   echo "$script_dir/pcheck.lock"
 }
 
+_package_check_repo() {
+	 echo "https://github.com/YunoHost/package_check"
+}
+
+_package_check_upgrade_file() {
+	 echo "$script_dir/upgrade_script.sh"
+}
+
+_package_check_version_file() {
+	 echo "$script_dir/package_version"
+}
+
 # FUNCTIONS
 
 usage() {
@@ -196,6 +208,58 @@ ensure_no_other_process_is_executing_script() {
   touch $lock
 }
 
+_upgrade_package_check() {
+  local -r repo_url=$1
+  local -r upgrade_script_file=$2
+  local -r process_lock_file=$3
+  local -r tmp_dir=$( mktemp --directory )
+
+  ECHO_FORMAT "Updating package_check...\n" "white" "bold"
+
+  rm $upgrade_script_file
+
+  {
+
+    echo -e "#!/bin/bash\n"
+    echo "git clone --quiet $repo_url \"$tmp_dir\""
+    echo "sudo cp --archive \"$tmp_dir/.\" \"$script_dir/.\""
+    echo "sudo rm --force --recursive \"$tmp_dir\""
+    echo "sudo rm \"$process_lock_file\""
+    echo "exec \"$script_dir\" \"$ARGS\""
+
+  } >> $upgrade_script_file
+
+  chmod +x $upgrade_script_file
+  exec $upgrade_script_file
+}
+
+_get_git_repo_remote_version() {
+  local -r repo_url=$1
+
+  echo $( git ls-remote $repo_url \
+    | cut -f 1 \
+    | head -n1 
+  )
+}
+
+ensure_package_check_is_up_to_date() {
+  local -r repo_url=$( _package_check_repo )
+  local -r upgrade_script_file=$( _package_check_upgrade_file )
+  local -r local_version_file=$( _package_check_version_file )
+  local -r process_lock_file=$( _process_lock_file )
+  local -r remote_version=$( _get_git_repo_remote_version $repo_url )
+  local local_version=
+
+  if file_exists $local_version_file; then
+    local_version=$( cat $local_version_file )
+
+    if [ $remote_version != $local_version ]; then      
+      _upgrade_package_check $repo_url $upgrade_script_file $process_lock_file
+    fi
+  fi
+  echo $remote_version > $local_version_file
+}
+
 main() {
   parse_options_and_arguments
   set_script_dir
@@ -207,31 +271,12 @@ main() {
 
   ensure_internet_connection_is_working "yunohost.org" "framasoft.org"
   ensure_no_other_process_is_executing_script $bash_mode
+  ensure_package_check_is_up_to_date
 }
 
 main
 
 ### REFACTORED END ###
-
-version_script="$(git ls-remote https://github.com/YunoHost/package_check | cut -f 1 | head -n1)"
-if [ -e "$script_dir/package_version" ]
-then
-	if [ "$version_script" != "$(cat "$script_dir/package_version")" ]; then	# Si le dernier commit sur github ne correspond pas au commit enregistré, il y a une mise à jour.
-		# Écrit le script de mise à jour, qui sera exécuté à la place de ce script, pour le remplacer et le relancer après.
-		ECHO_FORMAT "Mise à jour de Package check...\n" "white" "bold"
-		echo -e "#!/bin/bash\n" > "$script_dir/upgrade_script.sh"
-		echo "git clone --quiet https://github.com/YunoHost/package_check \"$script_dir/upgrade\"" >> "$script_dir/upgrade_script.sh"
-		echo "sudo cp -a \"$script_dir/upgrade/.\" \"$script_dir/.\"" >> "$script_dir/upgrade_script.sh"
-		echo "sudo rm -r \"$script_dir/upgrade\"" >> "$script_dir/upgrade_script.sh"
-		echo "echo \"$version_script\" > \"$script_dir/package_version\"" >> "$script_dir/upgrade_script.sh"
-		echo "sudo rm \"$script_dir/pcheck.lock\"" >> "$script_dir/upgrade_script.sh"
-		echo "exec \"$script_dir/package_check.sh\" \"$*\"" >> "$script_dir/upgrade_script.sh"
-		chmod +x "$script_dir/upgrade_script.sh"
-		exec "$script_dir/upgrade_script.sh"	#Exécute le script de mise à jour.
-	fi
-else
-	echo "$version_script" > "$script_dir/package_version"
-fi
 
 version_plinter="$(git ls-remote https://github.com/YunoHost/package_linter | cut -f 1 | head -n1)"
 if [ -e "$script_dir/plinter_version" ]
