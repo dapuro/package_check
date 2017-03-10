@@ -13,6 +13,7 @@ bash_mode=0
 no_lxc=0
 build_lxc=0
 force_install_ok=0
+script_dir=""
 
 # FUNCTIONS
 
@@ -110,16 +111,22 @@ parse_options_and_arguments() {
   return 0
 } 
 
+set_script_dir() {
+  if [ "${0:0:1}" == "/" ]; then
+    script_dir="$(dirname "$0")";
+  else
+    script_dir=$PROGDIR
+  fi
+}
+
 main() {
   parse_options_and_arguments
+  set_script_dir
 }
 
 main
 
 ### REFACTORED END ###
-
-# Récupère le dossier du script
-if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
 
 # Check user
 if [ "$(whoami)" != "$(cat "$script_dir/sub_scripts/setup_user")" ] && test -e "$script_dir/sub_scripts/setup_user"; then
