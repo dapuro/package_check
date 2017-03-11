@@ -511,9 +511,6 @@ find_or_create_test_user() {
     # Remove underscores
 		test_user_cleaned=${test_user//"_"/""}
 
-    # FIXME: do we really need this global variable?
-    USER_TEST_CLEAN="${test_user_cleaned}"
-
     firstname="${test_user_cleaned}"
     lastname="${test_user_cleaned}"
     mail="${test_user_cleaned}@${domain}"
@@ -524,6 +521,8 @@ find_or_create_test_user() {
 			ECHO_FORMAT "Test user could not be created. Can not continue ... \n" "red"
       _remove_process_lock
 			exit 1
+    else
+      echo $user_test_clean
 		fi
 	fi
 }
@@ -581,7 +580,6 @@ duplicate_app_for_test() {
   fi
 
   if _is_url $source_path; then
-    GIT_PACKAGE=1
     git clone $source_path $branch $target_path
   else
     # FIXME: do we need sudo here?
@@ -649,12 +647,17 @@ main() {
   else
 	  DOMAIN=$( _ynh_domain )
     SOUS_DOMAIN="sous.$DOMAIN"
-    find_or_create_test_user $USER_TEST $DOMAIN $PASSWORD_TEST
+    # FIXME: do we really need this global variable?
+    USER_TEST_CLEAN=$( find_or_create_test_user $USER_TEST $DOMAIN $PASSWORD_TEST )
     ensure_subdomain_exists $SOUS_DOMAIN
   fi
 
   local -r test_app_dir=$( _test_app_dir )
   duplicate_app_for_test "${arg_app}" "${gitbranch}" $test_app_dir "${script_dir}/*_check"
+
+  if _is_url $arg_app; then
+    GIT_PACKAGE=1
+  fi
   APP_CHECK=$test_app_dir
 
   if lxc_container_is_used; then
