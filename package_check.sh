@@ -33,6 +33,7 @@ SOUS_DOMAIN=""
 GIT_PACKAGE=0
 APP_CHECK=""
 APP_PATH_YUNO=""
+check_file=0
 
 # HELPER FUNCTIONS
 
@@ -104,6 +105,12 @@ _lxc_container_domain() {
 
 _test_app_dir() {
   echo "$script_dir/$( basename "$arg_app" )_check"
+}
+
+_test_app_check_process_file() {
+  local -r test_app_dir=$( _test_app_dir )
+  
+  echo "${test_app_dir}/check_process"
 }
 
 # FUNCTIONS
@@ -595,6 +602,15 @@ ensure_test_app_dir_exists() {
   sudo rm --recursive --force "$path_to_test_app/.git"
 }
 
+ensure_test_app_has_check_process_file() {
+  local -r check_process_file=$( _test_app_check_process_file )
+
+  if ! file_exists $check_process_file; then
+  	ECHO_FORMAT "\nUnable to find check_process file $check_process_file.\n" "red"
+  	ECHO_FORMAT "PackageCheck will run in degraded mode!\n" "lyellow"
+    return 1
+  fi
+}
 
 main() {
   parse_options_and_arguments
@@ -648,22 +664,16 @@ main() {
   fi
 
   ensure_test_app_dir_exists
+  if ensure_test_app_has_check_process_file; then
+    echo "" #nothing to do
+  else
+    check_file=0
+  fi
 }
 
 main
 
 ### REFACTORED END ###
-
-
-# Vérifie l'existence du fichier check_process
-check_file=1
-if [ ! -e "$APP_CHECK/check_process" ]; then
-	ECHO_FORMAT "\nImpossible de trouver le fichier check_process pour procéder aux tests.\n" "red"
-	ECHO_FORMAT "Package check va être utilisé en mode dégradé.\n" "lyellow"
-	check_file=0
-fi
-
-
 
 # Cette fonctionne détermine le niveau final de l'application, en prenant en compte d'éventuels forçages
 APP_LEVEL () {
