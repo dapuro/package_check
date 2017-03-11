@@ -48,6 +48,12 @@ is_empty() {
   [[ -z $var ]]
 }
 
+is_dir() {
+  local dir=$1
+
+  [[ -d $dir ]]
+}
+
 _setup_user_file() {
   echo "$script_dir/sub_scripts/setup_user"
 }
@@ -574,7 +580,21 @@ duplicate_app_for_test() {
     # FIXME: do we need sudo here?
     sudo cp --archive --remove-destination $source_path $target_path
   fi
+
 }
+
+ensure_test_app_dir_exists() {
+  local -r path_to_test_app=$( _test_app_dir )
+
+  if ! is_dir $path_to_test_app; then
+    ECHO_FORMAT "The application test folder can not be found!\n" "red"
+    _remove_process_lock
+    exit 1
+  fi
+  # FIXME: do we need sudo here?
+  sudo rm --recursive --force "$path_to_test_app/.git"
+}
+
 
 main() {
   parse_options_and_arguments
@@ -617,27 +637,23 @@ main() {
     ensure_subdomain_exists $SOUS_DOMAIN
   fi
 
-  duplicate_app_for_test "${arg_app}" "${gitbranch}" $( _test_app_dir ) "${script_dir}/*_check"
-  APP_CHECK=$( _test_app_dir )
+  local -r test_app_dir=$( _test_app_dir )
+  duplicate_app_for_test "${arg_app}" "${gitbranch}" $test_app_dir "${script_dir}/*_check"
+  APP_CHECK=$test_app_dir
 
   if lxc_container_is_used; then
 	  APP_PATH_YUNO="$(basename "$arg_app")_check"
   else
 	  APP_PATH_YUNO="$APP_CHECK"
   fi
-}
 
+  ensure_test_app_dir_exists
+}
 
 main
 
 ### REFACTORED END ###
 
-if [ ! -d "$APP_CHECK" ]; then
-	ECHO_FORMAT "Le dossier de l'application a tester est introuvable...\n" "red"
-	sudo rm "$script_dir/pcheck.lock" # Retire le lock
-	exit 1
-fi
-sudo rm -rf "$APP_CHECK/.git"	# Purge des fichiers de git
 
 # Vérifie l'existence du fichier check_process
 check_file=1
