@@ -12,7 +12,9 @@ readonly ARGS="$@"
 bash_mode=0
 no_lxc=0
 build_lxc=0
+gitbranch=""
 force_install_ok=0
+arg_app=""
 script_dir=""
 
 USER_TEST="package_checker"
@@ -27,6 +29,9 @@ YUNO_PWD=""
 DOMAIN=""
 main_iface=""
 SOUS_DOMAIN=""
+
+GIT_PACKAGE=0
+APP_CHECK=""
 
 # HELPER FUNCTIONS
 
@@ -88,6 +93,10 @@ _lxc_container_domain() {
   local -r container_name=$1
 
   sudo cat /var/lib/lxc/$container_name/rootfs/etc/yunohost/current_host
+}
+
+_test_app_dir() {
+  echo "$script_dir/$( basename "$arg_app" )_check"
 }
 
 # FUNCTIONS
@@ -537,6 +546,35 @@ ensure_subdomain_exists() {
 		fi
 	fi
 }
+
+_is_url() {
+  local -r string=$1
+
+  echo $string | grep --extended-regexp --quiet "https?:\/\/"
+  [[ $? -eq 0 ]]
+}
+
+duplicate_app_for_test() {
+  local -r source_path=$1
+  local -r branch=$2
+  local -r target_path=$3
+  local -r files_and_folder_to_remove=$4
+
+  echo "Retrieve git repository to test."
+
+  if [ $files_and_folder_to_remove != "/" ]; then
+    rm --recursive --force $files_and_folder_to_remove
+  fi
+
+  if _is_url $source_path; then
+    GIT_PACKAGE=1
+    git clone $source_path $branch $target_path
+  else
+    # FIXME: do we need sudo here?
+    sudo cp --archive --remove-destination $source_path $target_path
+  fi
+}
+
 main() {
   parse_options_and_arguments
   set_script_dir
@@ -577,28 +615,15 @@ main() {
     find_or_create_test_user $USER_TEST $DOMAIN $PASSWORD_TEST
     ensure_subdomain_exists $SOUS_DOMAIN
   fi
+
+  duplicate_app_for_test "${arg_app}" "${gitbranch}" $( _test_app_dir ) "${script_dir}/*_check"
+  APP_CHECK=$( _test_app_dir )
 }
 
 main
 
 ### REFACTORED END ###
 
-# Récupère les informations depuis le fichier de conf (Ou le complète le cas échéant)
-pcheck_config="$script_dir/config"
-
-# Vérifie le type d'emplacement du package à tester
-echo "Récupération du package à tester."
-rm -rf "$script_dir"/*_check
-GIT_PACKAGE=0
-if echo "$arg_app" | grep -Eq "https?:\/\/"
-then
-	GIT_PACKAGE=1
-	git clone $arg_app $gitbranch "$script_dir/$(basename "$arg_app")_check"
-else
-	# Si c'est un dossier local, il est copié dans le dossier du script.
-	sudo cp -a --remove-destination "$arg_app" "$script_dir/$(basename "$arg_app")_check"
-fi
-APP_CHECK="$script_dir/$(basename "$arg_app")_check"
 if [ "$no_lxc" -eq 0 ]
 then	# En cas d'exécution dans LXC, l'app sera dans le home de l'user LXC.
 	APP_PATH_YUNO="$(basename "$arg_app")_check"
