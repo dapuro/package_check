@@ -32,6 +32,7 @@ SOUS_DOMAIN=""
 
 GIT_PACKAGE=0
 APP_CHECK=""
+APP_PATH_YUNO=""
 
 # HELPER FUNCTIONS
 
@@ -618,18 +619,18 @@ main() {
 
   duplicate_app_for_test "${arg_app}" "${gitbranch}" $( _test_app_dir ) "${script_dir}/*_check"
   APP_CHECK=$( _test_app_dir )
+
+  if lxc_container_is_used; then
+	  APP_PATH_YUNO="$(basename "$arg_app")_check"
+  else
+	  APP_PATH_YUNO="$APP_CHECK"
+  fi
 }
+
 
 main
 
 ### REFACTORED END ###
-
-if [ "$no_lxc" -eq 0 ]
-then	# En cas d'exécution dans LXC, l'app sera dans le home de l'user LXC.
-	APP_PATH_YUNO="$(basename "$arg_app")_check"
-else
-	APP_PATH_YUNO="$APP_CHECK"
-fi
 
 if [ ! -d "$APP_CHECK" ]; then
 	ECHO_FORMAT "Le dossier de l'application a tester est introuvable...\n" "red"
