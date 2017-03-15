@@ -173,6 +173,18 @@ _test_app_check_process_file() {
   echo "${test_app_dir}/check_process"
 }
 
+_complete_log_file() {
+  echo "$COMPLETE_LOG"
+}
+
+_test_results_log_file() {
+  echo "$RESULT"
+}
+
+_lxc_boot_log_file() {
+  echo "$script_dir/lxc_boot.log"
+}
+
 # FUNCTIONS
 
 usage() {
@@ -924,6 +936,16 @@ INIT_VAR() {
 	final_path_already_use=0
 }
 
+initialize_log_files() {
+  local -r complete_log_file=$( _complete_log_file )
+  local -r test_results_log_file=$( _test_results_log_file )
+  local -r lxc_boot_log_file=$( _lxc_boot_log_file )
+
+  echo -n "" > $complete_log_file
+  echo -n "" > $test_results_log_file
+  echo -n "" | sudo tee $lxc_boot_log_file
+}
+
 main() {
   parse_options_and_arguments
   set_script_dir
@@ -989,16 +1011,14 @@ main() {
 
   INIT_VAR
   INIT_LEVEL
+
+  initialize_log_files
 }
 
 main
 
 ### REFACTORED END ###
 
-
-echo -n "" > "$COMPLETE_LOG"	# Initialise le fichier de log
-echo -n "" > "$RESULT"	# Initialise le fichier des résulats d'analyse
-echo -n "" | sudo tee "$script_dir/lxc_boot.log"	# Initialise le fichier de log du boot du conteneur
 if [ "$no_lxc" -eq 0 ]; then
 	LXC_INIT
 fi
