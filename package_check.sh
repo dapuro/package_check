@@ -434,7 +434,7 @@ find_and_store_iface_config_value() {
 
   if is_empty $result; then
     # FIXME: do we need a sudo here?
-    result=$( route \
+    result=$( sudo route \
       | grep default \
       | awk '{print $8;}' 
     )
@@ -700,6 +700,112 @@ APP_LEVEL() {
   level=$( _calculate_final_level )
 }
 
+_print_test_result() {
+  local -r result=$1
+  local -r title=$2
+
+  ECHO_FORMAT "${title}: "
+	if [[ $result -eq 1 ]]; then
+		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
+	elif [[ $result -eq -1 ]]; then
+		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
+	else
+		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
+	fi
+}
+
+# FIXME: 
+# 1) the order in which test results are displayed
+# 2) displayed tab indention
+# Depends on global variables: $GLOBAL*
+_print_test_results() {
+  declare -A results
+  local result=0
+  local title=""
+
+  results["Package Linter"]=$GLOBAL_LINTER
+  results["Installation"]=$GLOBAL_CHECK_SETUP
+  results["Removal"]=$GLOBAL_CHECK_REMOVE
+  results["Installation on sub-path"]=$GLOBAL_CHECK_SUB_DIR
+  results["Removal from sub-path"]=$GLOBAL_CHECK_REMOVE_SUBDIR
+  results["Installation on root-path"]=$GLOBAL_CHECK_ROOT
+  results["Removal from root-path"]=$GLOBAL_CHECK_REMOVE_ROOT
+  results["Upgrade"]=$GLOBAL_CHECK_UPGRADE
+  results["Private installation"]=$GLOBAL_CHECK_PRIVATE
+  results["Public installation"]=$GLOBAL_CHECK_PUBLIC
+  results["Multi-instance installation"]=$GLOBAL_CHECK_MULTI_INSTANCE
+  results["Bad user"]=$GLOBAL_CHECK_ADMIN
+  results["Wrong domain"]=$GLOBAL_CHECK_DOMAIN
+  results["Wrong path"]=$GLOBAL_CHECK_PATH
+  results["Port already in use"]=$GLOBAL_CHECK_PORT
+  results["Backup"]=$GLOBAL_CHECK_BACKUP
+  results["Restore"]=$GLOBAL_CHECK_RESTORE
+
+  ECHO_FORMAT "\n\n"
+
+  for title in "${!results[@]}"; do
+    result=${results["${title}"]}
+    _print_test_result "$result" "$title"
+  done
+}
+
+# Depends on global variables: $note, $tnote, $level, $level[]
+_print_test_results_summary() {
+  local color_note=""
+  local typo_note=""
+  local smiley=""
+
+	ECHO_FORMAT "\t\t    Results: $note/$tnote - " "white" "bold"
+
+	if [[ $note -gt 0 ]]; then
+		note=$(( note * 20 / tnote ))
+	fi
+
+  if [[ $note -le 5 ]]; then
+    color_note="red"
+    typo_note="bold"
+    smiley=":'("
+  elif [[ $note -le 10 ]]; then
+    color_note="red"
+    smiley=":("
+  elif [[ $note -le 15 ]]; then
+    color_note="lyellow"
+    smiley=":s"
+  elif [[ $note -gt 15 ]]; then
+    color_note="lgreen"
+    smiley=":)"
+  fi
+
+  if [[ $note -ge 20 ]]; then
+    color_note="lgreen"
+    typo_note="bold"
+    smiley="\o/"
+  fi
+
+	ECHO_FORMAT "$note/20 $smiley\n" "$color_note" "$typo_note"
+	ECHO_FORMAT "\t   Test set: $tnote/21\n\n" "white" "bold"
+
+	ECHO_FORMAT "Quality level of application: $level\n" "white" "bold"
+	for i in {1..10}
+	do
+		ECHO_FORMAT "\t   Level $i: "
+		if [[ ${level[i]} == "na" ]]; then
+			ECHO_FORMAT "N/A\n"
+		elif [[ ${level[i]} -ge 1 ]]; then
+			ECHO_FORMAT "1\n" "white" "bold"
+		else
+			ECHO_FORMAT "0\n"
+		fi
+	done
+}
+
+TEST_RESULTS() {
+  APP_LEVEL
+
+  _print_test_results
+  _print_test_results_summary
+}
+
 main() {
   parse_options_and_arguments
   set_script_dir
@@ -767,231 +873,6 @@ main() {
 main
 
 ### REFACTORED END ###
-
-TEST_RESULTS () {
-	APP_LEVEL
-	ECHO_FORMAT "\n\nPackage linter: "
-	if [ "$GLOBAL_LINTER" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_LINTER" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-	fi
-	ECHO_FORMAT "Installation: "
-	if [ "$GLOBAL_CHECK_SETUP" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_SETUP" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
-	fi
-
-	ECHO_FORMAT "Suppression: "
-	if [ "$GLOBAL_CHECK_REMOVE" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_REMOVE" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
-	fi
-
-	ECHO_FORMAT "Installation en sous-dossier: "
-	if [ "$GLOBAL_CHECK_SUB_DIR" -eq 1 ]; then
-		ECHO_FORMAT "\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_SUB_DIR" -eq -1 ]; then
-		ECHO_FORMAT "\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\tNot evaluated.\n" "white"
-	fi
-
-	ECHO_FORMAT "Suppression depuis sous-dossier: "
-	if [ "$GLOBAL_CHECK_REMOVE_SUBDIR" -eq 1 ]; then
-		ECHO_FORMAT "\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_REMOVE_SUBDIR" -eq -1 ]; then
-		ECHO_FORMAT "\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\tNot evaluated.\n" "white"
-	fi
-
-	ECHO_FORMAT "Installation à la racine: "
-	if [ "$GLOBAL_CHECK_ROOT" -eq 1 ]; then
-		ECHO_FORMAT "\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_ROOT" -eq -1 ]; then
-		ECHO_FORMAT "\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\tNot evaluated.\n" "white"
-	fi
-
-	ECHO_FORMAT "Suppression depuis racine: "
-	if [ "$GLOBAL_CHECK_REMOVE_ROOT" -eq 1 ]; then
-		ECHO_FORMAT "\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_REMOVE_ROOT" -eq -1 ]; then
-		ECHO_FORMAT "\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\tNot evaluated.\n" "white"
-	fi
-
-	ECHO_FORMAT "Upgrade: "
-	if [ "$GLOBAL_CHECK_UPGRADE" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_UPGRADE" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
-	fi
-
-	ECHO_FORMAT "Installation privée: "
-	if [ "$GLOBAL_CHECK_PRIVATE" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_PRIVATE" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-	fi
-
-	ECHO_FORMAT "Installation publique: "
-	if [ "$GLOBAL_CHECK_PUBLIC" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_PUBLIC" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-	fi
-
-	ECHO_FORMAT "Installation multi-instance: "
-	if [ "$GLOBAL_CHECK_MULTI_INSTANCE" -eq 1 ]; then
-		ECHO_FORMAT "\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_MULTI_INSTANCE" -eq -1 ]; then
-		ECHO_FORMAT "\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\tNot evaluated.\n" "white"
-	fi
-
-	ECHO_FORMAT "Mauvais utilisateur: "
-	if [ "$GLOBAL_CHECK_ADMIN" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_ADMIN" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-	fi
-
-	ECHO_FORMAT "Erreur de domaine: "
-	if [ "$GLOBAL_CHECK_DOMAIN" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_DOMAIN" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-	fi
-
-	ECHO_FORMAT "Correction de path: "
-	if [ "$GLOBAL_CHECK_PATH" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_PATH" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-	fi
-
-	ECHO_FORMAT "Port déjà utilisé: "
-	if [ "$GLOBAL_CHECK_PORT" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_PORT" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-	fi
-
-# 	ECHO_FORMAT "Source corrompue: "
-# 	if [ "$GLOBAL_CHECK_CORRUPT" -eq 1 ]; then
-# 		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-# 	elif [ "$GLOBAL_CHECK_CORRUPT" -eq -1 ]; then
-# 		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-# 	else
-# 		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-# 	fi
-
-# 	ECHO_FORMAT "Erreur de téléchargement de la source: "
-# 	if [ "$GLOBAL_CHECK_DL" -eq 1 ]; then
-# 		ECHO_FORMAT "\tSUCCESS\n" "lgreen"
-# 	elif [ "$GLOBAL_CHECK_DL" -eq -1 ]; then
-# 		ECHO_FORMAT "\tFAIL\n" "lred"
-# 	else
-# 		ECHO_FORMAT "\tNot evaluated.\n" "white"
-# 	fi
-
-# 	ECHO_FORMAT "Dossier déjà utilisé: "
-# 	if [ "$GLOBAL_CHECK_FINALPATH" -eq 1 ]; then
-# 		ECHO_FORMAT "\t\t\tSUCCESS\n" "lgreen"
-# 	elif [ "$GLOBAL_CHECK_FINALPATH" -eq -1 ]; then
-# 		ECHO_FORMAT "\t\t\tFAIL\n" "lred"
-# 	else
-# 		ECHO_FORMAT "\t\t\tNot evaluated.\n" "white"
-# 	fi
-
-	ECHO_FORMAT "Backup: "
-	if [ "$GLOBAL_CHECK_BACKUP" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_BACKUP" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
-	fi
-
-	ECHO_FORMAT "Restore: "
-	if [ "$GLOBAL_CHECK_RESTORE" -eq 1 ]; then
-		ECHO_FORMAT "\t\t\t\tSUCCESS\n" "lgreen"
-	elif [ "$GLOBAL_CHECK_RESTORE" -eq -1 ]; then
-		ECHO_FORMAT "\t\t\t\tFAIL\n" "lred"
-	else
-		ECHO_FORMAT "\t\t\t\tNot evaluated.\n" "white"
-	fi
-	ECHO_FORMAT "\t\t    Notes de résultats: $note/$tnote - " "white" "bold"
-	if [ "$note" -gt 0 ]
-	then
-		note=$(( note * 20 / tnote ))
-	fi
-		if [ "$note" -le 5 ]; then
-			color_note="red"
-			typo_note="bold"
-			smiley=":'("	# La contribution à Shasha. Qui m'a forcé à ajouté les smiley sous la contrainte ;)
-		elif [ "$note" -le 10 ]; then
-			color_note="red"
-			typo_note=""
-			smiley=":("
-		elif [ "$note" -le 15 ]; then
-			color_note="lyellow"
-			typo_note=""
-			smiley=":s"
-		elif [ "$note" -gt 15 ]; then
-			color_note="lgreen"
-			typo_note=""
-			smiley=":)"
-		fi
-		if [ "$note" -ge 20 ]; then
-			color_note="lgreen"
-			typo_note="bold"
-			smiley="\o/"
-		fi
-	ECHO_FORMAT "$note/20 $smiley\n" "$color_note" "$typo_note"
-	ECHO_FORMAT "\t   Ensemble de tests effectués: $tnote/21\n\n" "white" "bold"
-
-	# Affiche le niveau final
-	ECHO_FORMAT "Niveau de l'application: $level\n" "white" "bold"
-	for i in {1..10}
-	do
-		ECHO_FORMAT "\t   Niveau $i: "
-		if [ "${level[i]}" == "na" ]; then
-			ECHO_FORMAT "N/A\n"
-		elif [ "${level[i]}" -ge 1 ]; then
-			ECHO_FORMAT "1\n" "white" "bold"
-		else
-			ECHO_FORMAT "0\n"
-		fi
-	done
-}
 
 INIT_VAR() {
 	GLOBAL_LINTER=0
