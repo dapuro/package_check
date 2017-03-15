@@ -1013,15 +1013,15 @@ main() {
   INIT_LEVEL
 
   initialize_log_files
+
+  if lxc_container_is_used; then
+    LXC_INIT
+  fi
 }
 
 main
 
 ### REFACTORED END ###
-
-if [ "$no_lxc" -eq 0 ]; then
-	LXC_INIT
-fi
 
 if [ "$check_file" -eq 1 ]
 then # Si le fichier check_process est trouvé
