@@ -610,6 +610,22 @@ ensure_test_app_has_check_process_file() {
   fi
 }
 
+INIT_LEVEL() {
+  local i=-1
+
+  for i in {1..7}; do
+    if [[ $i == 4 ]]; then
+      level[$i]=0
+    else
+      level[$i]="auto"
+    fi
+  done
+
+  for i in {8..10}; do
+    level[$i]=0
+  done
+}
+
 main() {
   parse_options_and_arguments
   set_script_dir
@@ -1041,19 +1057,6 @@ INIT_VAR() {
 	fail_download_source=0
 	port_already_use=0
 	final_path_already_use=0
-}
-
-INIT_LEVEL() {
-	level[1]="auto"		# L'application s'installe et se désinstalle correctement. -- Peut être vérifié par package_check
-	level[2]="auto"		# L'application s'installe et se désinstalle dans toutes les configurations communes. -- Peut être vérifié par package_check
-	level[3]="auto"		# L'application supporte l'upgrade depuis une ancienne version du package. -- Peut être vérifié par package_check
-	level[4]=0			# L'application prend en charge de LDAP et/ou HTTP Auth. -- Doit être vérifié manuellement
-	level[5]="auto"		# Aucune erreur dans package_linter. -- Peut être vérifié par package_check
-	level[6]="auto"		# L'application peut-être sauvegardée et restaurée sans erreurs sur la même machine ou une autre. -- Peut être vérifié par package_check
-	level[7]="auto"		# Aucune erreur dans package check. -- Peut être vérifié par package_check
-	level[8]=0			# L'application respecte toutes les YEP recommandées. -- Doit être vérifié manuellement
-	level[9]=0			# L'application respecte toutes les YEP optionnelles. -- Doit être vérifié manuellement
-	level[10]=0			# L'application est jugée parfaite. -- Doit être vérifié manuellement
 }
 
 INIT_VAR
