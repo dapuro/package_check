@@ -64,11 +64,13 @@ _process_lock_file() {
 }
 
 _package_check_repo() {
-	 echo "https://github.com/YunoHost/package_check"
+  # FIXME
+  # echo "https://github.com/YunoHost/package_check"
+  echo "https://github.com/dapuro/package_check"
 }
 
 _package_check_upgrade_file() {
-	 echo "$script_dir/upgrade_script.sh"
+  echo "$script_dir/upgrade_script.sh"
 }
 
 _package_check_version_file() {
