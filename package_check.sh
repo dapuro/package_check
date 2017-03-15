@@ -35,6 +35,64 @@ APP_CHECK=""
 APP_PATH_YUNO=""
 check_file=1
 
+note=0
+tnote=0
+level=0
+
+GLOBAL_LINTER=0
+GLOBAL_CHECK_SETUP=0
+GLOBAL_CHECK_SUB_DIR=0
+GLOBAL_CHECK_ROOT=0
+GLOBAL_CHECK_REMOVE=0
+GLOBAL_CHECK_REMOVE_SUBDIR=0
+GLOBAL_CHECK_REMOVE_ROOT=0
+GLOBAL_CHECK_UPGRADE=0
+GLOBAL_CHECK_BACKUP=0
+GLOBAL_CHECK_RESTORE=0
+GLOBAL_CHECK_PRIVATE=0
+GLOBAL_CHECK_PUBLIC=0
+GLOBAL_CHECK_MULTI_INSTANCE=0
+GLOBAL_CHECK_ADMIN=0
+GLOBAL_CHECK_DOMAIN=0
+GLOBAL_CHECK_PATH=0
+GLOBAL_CHECK_CORRUPT=0
+GLOBAL_CHECK_DL=0
+GLOBAL_CHECK_PORT=0
+GLOBAL_CHECK_FINALPATH=0
+IN_PROCESS=0
+MANIFEST=0
+CHECKS=0
+auto_remove=1
+install_pass=0
+all_test=0
+use_curl=0
+
+MANIFEST_DOMAIN="null"
+MANIFEST_PATH="null"
+MANIFEST_USER="null"
+MANIFEST_PUBLIC="null"
+MANIFEST_PUBLIC_public="null"
+MANIFEST_PUBLIC_private="null"
+MANIFEST_PASSWORD="null"
+MANIFEST_PORT="null"
+
+pkg_linter=0
+setup_sub_dir=0
+setup_root=0
+setup_nourl=0
+setup_private=0
+setup_public=0
+upgrade=0
+backup_restore=0
+multi_instance=0
+wrong_user=0
+wrong_path=0
+incorrect_path=0
+corrupt_source=0
+fail_download_source=0
+port_already_use=0
+final_path_already_use=0
+
 # HELPER FUNCTIONS
 
 file_exists() {
@@ -808,6 +866,64 @@ TEST_RESULTS() {
   _print_test_results_summary
 }
 
+INIT_VAR() {
+	GLOBAL_LINTER=0
+	GLOBAL_CHECK_SETUP=0
+	GLOBAL_CHECK_SUB_DIR=0
+	GLOBAL_CHECK_ROOT=0
+	GLOBAL_CHECK_REMOVE=0
+	GLOBAL_CHECK_REMOVE_SUBDIR=0
+	GLOBAL_CHECK_REMOVE_ROOT=0
+	GLOBAL_CHECK_UPGRADE=0
+	GLOBAL_CHECK_BACKUP=0
+	GLOBAL_CHECK_RESTORE=0
+	GLOBAL_CHECK_PRIVATE=0
+	GLOBAL_CHECK_PUBLIC=0
+	GLOBAL_CHECK_MULTI_INSTANCE=0
+	GLOBAL_CHECK_ADMIN=0
+	GLOBAL_CHECK_DOMAIN=0
+	GLOBAL_CHECK_PATH=0
+	GLOBAL_CHECK_CORRUPT=0
+	GLOBAL_CHECK_DL=0
+	GLOBAL_CHECK_PORT=0
+	GLOBAL_CHECK_FINALPATH=0
+	IN_PROCESS=0
+	MANIFEST=0
+	CHECKS=0
+	auto_remove=1
+	install_pass=0
+	note=0
+	tnote=0
+	all_test=0
+	use_curl=0
+
+	MANIFEST_DOMAIN="null"
+	MANIFEST_PATH="null"
+	MANIFEST_USER="null"
+	MANIFEST_PUBLIC="null"
+	MANIFEST_PUBLIC_public="null"
+	MANIFEST_PUBLIC_private="null"
+	MANIFEST_PASSWORD="null"
+	MANIFEST_PORT="null"
+
+	pkg_linter=0
+	setup_sub_dir=0
+	setup_root=0
+	setup_nourl=0
+	setup_private=0
+	setup_public=0
+	upgrade=0
+	backup_restore=0
+	multi_instance=0
+	wrong_user=0
+	wrong_path=0
+	incorrect_path=0
+	corrupt_source=0
+	fail_download_source=0
+	port_already_use=0
+	final_path_already_use=0
+}
+
 main() {
   parse_options_and_arguments
   set_script_dir
@@ -870,72 +986,16 @@ main() {
   else
     check_file=0
   fi
+
+  INIT_VAR
+  INIT_LEVEL
 }
 
 main
 
 ### REFACTORED END ###
 
-INIT_VAR() {
-	GLOBAL_LINTER=0
-	GLOBAL_CHECK_SETUP=0
-	GLOBAL_CHECK_SUB_DIR=0
-	GLOBAL_CHECK_ROOT=0
-	GLOBAL_CHECK_REMOVE=0
-	GLOBAL_CHECK_REMOVE_SUBDIR=0
-	GLOBAL_CHECK_REMOVE_ROOT=0
-	GLOBAL_CHECK_UPGRADE=0
-	GLOBAL_CHECK_BACKUP=0
-	GLOBAL_CHECK_RESTORE=0
-	GLOBAL_CHECK_PRIVATE=0
-	GLOBAL_CHECK_PUBLIC=0
-	GLOBAL_CHECK_MULTI_INSTANCE=0
-	GLOBAL_CHECK_ADMIN=0
-	GLOBAL_CHECK_DOMAIN=0
-	GLOBAL_CHECK_PATH=0
-	GLOBAL_CHECK_CORRUPT=0
-	GLOBAL_CHECK_DL=0
-	GLOBAL_CHECK_PORT=0
-	GLOBAL_CHECK_FINALPATH=0
-	IN_PROCESS=0
-	MANIFEST=0
-	CHECKS=0
-	auto_remove=1
-	install_pass=0
-	note=0
-	tnote=0
-	all_test=0
-	use_curl=0
 
-	MANIFEST_DOMAIN="null"
-	MANIFEST_PATH="null"
-	MANIFEST_USER="null"
-	MANIFEST_PUBLIC="null"
-	MANIFEST_PUBLIC_public="null"
-	MANIFEST_PUBLIC_private="null"
-	MANIFEST_PASSWORD="null"
-	MANIFEST_PORT="null"
-
-	pkg_linter=0
-	setup_sub_dir=0
-	setup_root=0
-	setup_nourl=0
-	setup_private=0
-	setup_public=0
-	upgrade=0
-	backup_restore=0
-	multi_instance=0
-	wrong_user=0
-	wrong_path=0
-	incorrect_path=0
-	corrupt_source=0
-	fail_download_source=0
-	port_already_use=0
-	final_path_already_use=0
-}
-
-INIT_VAR
-INIT_LEVEL
 echo -n "" > "$COMPLETE_LOG"	# Initialise le fichier de log
 echo -n "" > "$RESULT"	# Initialise le fichier des résulats d'analyse
 echo -n "" | sudo tee "$script_dir/lxc_boot.log"	# Initialise le fichier de log du boot du conteneur
