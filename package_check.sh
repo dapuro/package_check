@@ -33,7 +33,7 @@ SOUS_DOMAIN=""
 GIT_PACKAGE=0
 APP_CHECK=""
 APP_PATH_YUNO=""
-check_file=0
+check_file=1
 
 # HELPER FUNCTIONS
 
@@ -626,6 +626,80 @@ INIT_LEVEL() {
   done
 }
 
+# Depends on global variables: level[*]
+_calculate_final_level() {
+  local i=-1
+  local result=0
+
+	for i in {1..10}; do
+		if [[ ${level[$i]} == "auto" ]]; then
+			level[$i]=0
+		elif [[ ${level[$i]} == "na" ]]; then
+			continue
+		elif [[ ${level[$i]} -ge 1 ]]; then
+			result=$i
+		else
+			break
+		fi
+	done
+
+  echo $result
+}
+
+# Depends on global variables: $level[*], $GLOBAL* ...
+_test_result_positive() {
+  local -r index=$1
+
+  case $index in 
+    1)
+      [[ $GLOBAL_CHECK_SETUP == 1 && $GLOBAL_CHECK_REMOVE == 1 ]]
+      ;;
+    2)
+      [[ $GLOBAL_CHECK_SUB_DIR != -1 && $GLOBAL_CHECK_REMOVE_SUBDIR != -1 && $GLOBAL_CHECK_ROOT != -1 && $GLOBAL_CHECK_REMOVE_ROOT != -1 && $GLOBAL_CHECK_PRIVATE != -1 && $GLOBAL_CHECK_PUBLIC != -1 && $GLOBAL_CHECK_MULTI_INSTANCE != -1 ]]
+      ;;
+    3)
+      [[ $GLOBAL_CHECK_UPGRADE == 1 || ( ${level[3]} == "2" && $GLOBAL_CHECK_UPGRADE != -1 ) ]]
+      ;;
+    5)
+      [[ $GLOBAL_LINTER == 1 || ( ${level[5]} == "2" && $GLOBAL_LINTER != -1 ) ]]
+      ;;
+    6)
+      [[ $GLOBAL_CHECK_BACKUP == 1 && $GLOBAL_CHECK_RESTORE == 1 || ( ${level[6]} == "2" && $GLOBAL_CHECK_BACKUP != -1 && $GLOBAL_CHECK_RESTORE != -1 ) ]]
+      ;;
+    7)
+      [[ $GLOBAL_CHECK_SETUP != -1 && $GLOBAL_CHECK_REMOVE != -1 && $GLOBAL_CHECK_SUB_DIR != -1 && $GLOBAL_CHECK_REMOVE_SUBDIR != -1 && $GLOBAL_CHECK_REMOVE_ROOT != -1 && $GLOBAL_CHECK_UPGRADE != -1 && $GLOBAL_CHECK_PRIVATE != -1 && $GLOBAL_CHECK_PUBLIC != -1 && $GLOBAL_CHECK_MULTI_INSTANCE != -1 && $GLOBAL_CHECK_ADMIN != -1 && $GLOBAL_CHECK_DOMAIN != -1 && $GLOBAL_CHECK_PATH != -1 && $GLOBAL_CHECK_PORT != -1 && $GLOBAL_CHECK_BACKUP != -1 && $GLOBAL_CHECK_RESTORE != -1 && ${level[5]} -ge -1 ]]
+      ;;
+  esac
+}
+
+# Depends on global variables: $level[*]
+_map_test_results_to_level() {
+  local i=-1
+
+  for i in {1..7}; do
+
+    if [[ $i == 4 ]]; then
+      continue
+    fi
+
+    if [[ ${level[$i]} == "auto" || ${level[$i]} == 2 ]]; then
+      if _test_result_positive $i; then
+        level[$i]=2
+      else
+        level[$i]=0
+      fi
+    fi
+  done
+}
+
+APP_LEVEL() {
+	level=0 	# Initialise le niveau final à 0
+
+  _map_test_results_to_level
+
+  level=$( _calculate_final_level )
+}
+
 main() {
   parse_options_and_arguments
   set_script_dir
@@ -693,88 +767,6 @@ main() {
 main
 
 ### REFACTORED END ###
-
-# Cette fonctionne détermine le niveau final de l'application, en prenant en compte d'éventuels forçages
-APP_LEVEL () {
-	level=0 	# Initialise le niveau final à 0
-	# Niveau 1: L'application ne s'installe pas ou ne fonctionne pas après installation.
-	if [ "${level[1]}" == "auto" ] || [ "${level[1]}" -eq 2 ]; then
-		if [ "$GLOBAL_CHECK_SETUP" -eq 1 ] && [ "$GLOBAL_CHECK_REMOVE" -eq 1 ]
-		then level[1]=2 ; else level[1]=0 ; fi
-	fi
-
-	# Niveau 2: L'application s'installe et se désinstalle dans toutes les configurations communes.
-	if [ "${level[2]}" == "auto" ] || [ "${level[2]}" -eq 2 ]; then
-		if 	[ "$GLOBAL_CHECK_SUB_DIR" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_REMOVE_SUBDIR" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_ROOT" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_REMOVE_ROOT" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_PRIVATE" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_PUBLIC" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_MULTI_INSTANCE" -ne -1 ]
-		then level[2]=2 ; else level[2]=0 ; fi
-	fi
-
-	# Niveau 3: L'application supporte l'upgrade depuis une ancienne version du package.
-	if [ "${level[3]}" == "auto" ] || [ "${level[3]}" == "2" ]; then
-		if [ "$GLOBAL_CHECK_UPGRADE" -eq 1 ] || ( [ "${level[3]}" == "2" ] && [ "$GLOBAL_CHECK_UPGRADE" -ne -1 ] )
-		then level[3]=2 ; else level[3]=0 ; fi
-	fi
-
-	# Niveau 4: L'application prend en charge de LDAP et/ou HTTP Auth. -- Doit être vérifié manuellement
-
-	# Niveau 5: Aucune erreur dans package_linter.
-	if [ "${level[5]}" == "auto" ] || [ "${level[5]}" == "2" ]; then
-		if [ "$GLOBAL_LINTER" -eq 1 ] || ( [ "${level[5]}" == "2" ] && [ "$GLOBAL_LINTER" -ne -1 ] )
-		then level[5]=2 ; else level[5]=0 ; fi
-	fi
-
-	# Niveau 6: L'application peut-être sauvegardée et restaurée sans erreurs sur la même machine ou une autre.
-	if [ "${level[6]}" == "auto" ] || [ "${level[6]}" == "2" ]; then
-		if [ "$GLOBAL_CHECK_BACKUP" -eq 1 ] && [ "$GLOBAL_CHECK_RESTORE" -eq 1 ] || ( [ "${level[6]}" == "2" ] && [ "$GLOBAL_CHECK_BACKUP" -ne -1 ] && [ "$GLOBAL_CHECK_RESTORE" -ne -1 ] )
-		then level[6]=2 ; else level[6]=0 ; fi
-	fi
-
-	# Niveau 7: Aucune erreur dans package check.
-	if [ "${level[7]}" == "auto" ] || [ "${level[7]}" == "2" ]; then
-		if 	[ "$GLOBAL_CHECK_SETUP" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_REMOVE" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_SUB_DIR" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_REMOVE_SUBDIR" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_REMOVE_ROOT" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_UPGRADE" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_PRIVATE" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_PUBLIC" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_MULTI_INSTANCE" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_ADMIN" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_DOMAIN" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_PATH" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_PORT" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_BACKUP" -ne -1 ] && \
-			[ "$GLOBAL_CHECK_RESTORE" -ne -1 ] && \
-			[ "${level[5]}" -ge -1 ]	# Si tout les tests sont validés. Et si le level 5 est validé ou forcé.
-		then level[7]=2 ; else level[7]=0 ; fi
-	fi
-
-	# Niveau 8: L'application respecte toutes les YEP recommandées. -- Doit être vérifié manuellement
-
-	# Niveau 9: L'application respecte toutes les YEP optionnelles. -- Doit être vérifié manuellement
-
-	# Niveau 10: L'application est jugée parfaite. -- Doit être vérifié manuellement
-
-	# Calcule le niveau final
-	for i in {1..10}; do
-		if [ "${level[i]}" == "auto" ]; then
-			level[i]=0	# Si des niveaux sont encore à auto, c'est une erreur de syntaxe dans le check_process, ils sont fixé à 0.
-		elif [ "${level[i]}" == "na" ]; then
-			continue	# Si le niveau est "non applicable" (na), il est ignoré dans le niveau final
-		elif [ "${level[i]}" -ge 1 ]; then
-			level=$i	# Si le niveau est validé, il est pris en compte dans le niveau final
-		else
-			break		# Dans les autres cas (niveau ni validé, ni ignoré), la boucle est stoppée. Le niveau final est donc le niveau précédemment validé
-		fi
-	done
-}
 
 TEST_RESULTS () {
 	APP_LEVEL
