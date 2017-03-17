@@ -156,6 +156,14 @@ _build_script_file() {
 
 }
 
+_auto_build_conf_file() {
+  echo "$script_dir/../auto_build/auto.conf"
+}
+
+_xmpp_bot_post_script() {
+  echo "$script_dir/../auto_build/xmpp_bot/xmpp_post.sh"
+}
+
 
 _lxc_container_domain() {
   local -r container_name=$1
@@ -1039,6 +1047,61 @@ initiate_degraded_test_suite() {
 	fi
 }
 
+# Depends on global variables: $arg_app
+generate_result_message() {
+  local -r level=$1
+  local -r app_name=$(basename "$arg_app")
+
+  if [[ $level == 0 ]]; then
+    echo "The application $app_name has just failed the Continuous Integration Test"
+  else
+    echo "The application $app_name has just reached level $level"
+  fi
+}
+
+notify_via_xmpp() {
+  local -r message=$1
+  local -r conf_file=$( _auto_build_conf_file )
+  local -r xmpp_bot_post_script=$( _xmpp_bot_post_script )
+  local -r domain=""
+  local -r path=""
+
+  if file_exists $conf_file; then
+    domain=$(grep "DOMAIN=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)
+    path=$(grep "CI_PATH=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)
+    ci_path="$domain/$path"
+
+    message="$message sur https://$ci_path"
+
+    xmpp_bot_post_script $message
+  fi
+}
+
+get_app_maintainer_email() {
+  local -r test_app_manifest_file=$( _test_app_manifest_file )
+
+  echo $(cat "$test_app_manifest_file" | grep '\"email\": ' | cut -d '"' -f 4)
+}
+
+notify_via_mail() {
+  local -r message=$1
+  local -r level=$2
+  local -r config_file="$script_dir/../config" # FIXME: what config file is this?
+  local -r recipient=""
+
+  if [[ $level == 0 && $( file_exists $config_file ) ]]; then	
+
+    recipient=$( get_app_maintainer_email )
+
+    ci_path=$(grep "CI_URL=" $config_file | cut -d= -f2)
+    
+    if [[ -n $ci_path ]]; then
+      message="$message sur $ci_path"
+    fi
+    mail -s "[YunoHost] Failed to install an application in the CI" "$recpicient" <<< "$message"
+  fi
+}
+
 main() {
   parse_options_and_arguments
   set_script_dir
@@ -1124,36 +1187,18 @@ main() {
   fi
 
   TEST_RESULTS
+
+  message=$( generate_result_message $level )
+
+  notify_via_xmpp $message
+
+  notify_via_mail $message $level
+
 }
 
 main
 
 ### REFACTORED END ###
-
-# Mail et bot xmpp pour le niveau de l'app
-if [ "$level" -eq 0 ]
-then
-	message="L'application $(basename "$arg_app") vient d'échouer aux tests d'intégration continue"
-else
-	message="L'application $(basename "$arg_app") vient d'atteindre le niveau $level"
-fi
-
-if [ -e "$script_dir/../auto_build/auto.conf" ]
-then
-	ci_path=$(grep "DOMAIN=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)/$(grep "CI_PATH=" "$script_dir/../auto_build/auto.conf" | cut -d= -f2)
-	message="$message sur https://$ci_path"
-	"$script_dir/../auto_build/xmpp_bot/xmpp_post.sh" "$message"	# Notifie sur le salon apps
-fi
-
-if [ "$level" -eq 0 ] && [ -e "$script_dir/../config" ]
-then	# Si l'app est au niveau 0, et que le test tourne en CI, envoi un mail d'avertissement.
-	dest=$(cat "$APP_CHECK/manifest.json" | grep '\"email\": ' | cut -d '"' -f 4)	# Utilise l'adresse du mainteneur de l'application
-	ci_path=$(grep "CI_URL=" "$script_dir/../config" | cut -d= -f2)
-	if [ -n "$ci_path" ]; then
-		message="$message sur $ci_path"
-	fi
-	mail -s "[YunoHost] Échec d'installation d'une application dans le CI" "$dest" <<< "$message"	# Envoi un avertissement par mail.
-fi
 
 echo "Le log complet des installations et suppressions est disponible dans le fichier $COMPLETE_LOG"
 # Clean
