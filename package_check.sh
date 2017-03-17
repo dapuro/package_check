@@ -167,6 +167,10 @@ _test_app_dir() {
   echo "$script_dir/$( basename "$arg_app" )_check"
 }
 
+_test_app_manifest_file() {
+ echo "$test_app_dir/manifest.json" 
+}
+
 _test_app_check_process_file() {
   local -r test_app_dir=$( _test_app_dir )
   
@@ -184,6 +188,14 @@ _test_results_log_file() {
 _lxc_boot_log_file() {
   echo "$script_dir/lxc_boot.log"
 }
+
+_manifest_extract_file() {
+  echo "$script_dir/manifest_extract"
+}
+_ci_python_script_file() {
+  echo "$script_dir/sub_scripts/ci/maniackc.py"
+}
+
 
 # FUNCTIONS
 
@@ -946,6 +958,87 @@ initialize_log_files() {
   echo -n "" | sudo tee $lxc_boot_log_file
 }
 
+parse_check_process_file() {
+  local -r check_process_file=$( _test_app_check_process_file )
+
+  source "$script_dir/lib/check_process_parsing.sh"
+
+  echo "Parsing check_process file"
+
+  _parse_levels $check_process_file
+  _parse_test_setup $check_process_file
+}
+
+# FIXME: to be refactored
+# Depends on global varibales: pkg_linter, ...
+initiate_degraded_test_suite() {
+  local -r ci_python_script_file=$( _ci_python_script_file )
+  local -r manifest_extract_file=$( _manifest_extract_file )
+  local -r test_app_manifest_file=$( _test_app_manifest_file )
+  local args=""
+
+  python "$ci_python_script_file" "$test_app_manifest_file" > $manifest_extract_file
+
+	pkg_linter=1
+	setup_sub_dir=1
+	setup_root=1
+	upgrade=1
+	backup_restore=1
+	multi_instance=1
+	wrong_user=1
+	wrong_path=1
+	incorrect_path=1
+	all_test=$((all_test+9))
+
+	while read line; do
+
+		if echo "$line" | grep -q ":ynh.local"; then
+			MANIFEST_DOMAIN=$(echo "$line" | grep ":ynh.local" | cut -d ':' -f1)
+		fi
+
+		if echo "$line" | grep -q "path:"; then
+			MANIFEST_PATH=$(echo "$line" | grep "path:" | cut -d ':' -f1)
+		fi
+
+		if echo "$line" | grep -q "user:\|admin:"; then
+			MANIFEST_USER=$(echo "$line" | grep "user:\|admin:" | cut -d ':' -f1)
+		fi
+
+    args=$(echo "$line" | cut -d ':' -f1,2 | sed s/:/=/)
+		MANIFEST_ARGS="${MANIFEST_ARGS}${args}&"
+
+	done < "$manifest_extract_file"
+
+	if [ "$MANIFEST_DOMAIN" == "null" ]; then
+		ECHO_FORMAT "The domain manifest key was not found.\n" "lyellow"
+		setup_sub_dir=0
+		setup_root=0
+		multi_instance=0
+		wrong_user=0
+		incorrect_path=0
+		all_test=$((all_test-5))
+	fi
+
+	if [ "$MANIFEST_PATH" == "null" ]; then
+		ECHO_FORMAT "The manifest key of the path was not found.\n" "lyellow"
+		setup_root=0
+		multi_instance=0
+		incorrect_path=0
+		all_test=$((all_test-3))
+	fi
+
+	if [ "$MANIFEST_USER" == "null" ]; then
+		ECHO_FORMAT "The manifest key of the user admin was not found.\n" "lyellow"
+		wrong_user=0
+		all_test=$((all_test-1))
+	fi
+
+	if grep multi_instance "$test_app_manifest_file" | grep -q false; then
+    # FIXME: why isn't all_test decremented here?
+		multi_instance=0
+	fi
+}
+
 main() {
   parse_options_and_arguments
   set_script_dir
@@ -1017,269 +1110,25 @@ main() {
   if lxc_container_is_used; then
     LXC_INIT
   fi
+
+  if file_exists $( _test_app_check_process_file ); then
+    parse_check_process_file
+  else
+    initiate_degraded_test_suite
+  fi
+
+  TESTING_PROCESS
+
+  if lxc_container_is_used; then
+    LXC_TURNOFF
+  fi
+
+  TEST_RESULTS
 }
 
 main
 
 ### REFACTORED END ###
-
-if [ "$check_file" -eq 1 ]
-then # Si le fichier check_process est trouvé
-	## Parsing du fichier check_process de manière séquentielle.
-	echo "Parsing du fichier check_process"
-	IN_LEVELS=0
-	while read <&4 LIGNE
-	do	# Parse les indications de niveaux d'app avant de parser les tests
-		LIGNE=$(echo $LIGNE | sed 's/^ *"//g')	# Efface les espaces en début de ligne
-		if [ "${LIGNE:0:1}" == "#" ]; then
-			continue	# Ligne de commentaire, ignorée.
-		fi
-		if echo "$LIGNE" | grep -q "^;;; Levels"; then	# Définition des variables de niveaux
-			IN_LEVELS=1
-		fi
-		if [ "$IN_LEVELS" -eq 1 ]
-		then
-			if echo "$LIGNE" | grep -q "Level "; then	# Définition d'un niveau
-				level[$(echo "$LIGNE" | cut -d '=' -f1 | cut -d ' ' -f2)]=$(echo "$LIGNE" | cut -d '=' -f2)
-			fi
-		fi
-	done 4< "$APP_CHECK/check_process"
-	while read <&4 LIGNE
-	do
-		LIGNE=$(echo $LIGNE | sed 's/^ *"//g')	# Efface les espaces en début de ligne
-		if [ "${LIGNE:0:1}" == "#" ]; then
-			# Ligne de commentaire, ignorée.
-			continue
-		fi
-		if echo "$LIGNE" | grep -q "^auto_remove="; then	# Indication d'auto remove
-			auto_remove=$(echo "$LIGNE" | cut -d '=' -f2)
-		fi
-		if echo "$LIGNE" | grep -q "^;;" && ! echo "$LIGNE" | grep -q "^;;;"; then	# Début d'un scénario de test
-			if [ "$IN_PROCESS" -eq 1 ]; then	# Un scénario est déjà en cours. Donc on a atteind la fin du scénario.
-				TESTING_PROCESS
-				TEST_RESULTS
-				INIT_VAR
-				if [ "$bash_mode" -ne 1 ]; then
-					read -p "Appuyer sur une touche pour démarrer le scénario de test suivant..." < /dev/tty
-				fi
-			fi
-			PROCESS_NAME=${LIGNE#;; }
-			IN_PROCESS=1
-			MANIFEST=0
-			CHECKS=0
-			IN_LEVELS=0
-		fi
-		if [ "$IN_PROCESS" -eq 1 ]
-		then	# Analyse des arguments du scenario de test
-			if echo "$LIGNE" | grep -q "^; Manifest"; then	# Arguments du manifest
-				MANIFEST=1
-				MANIFEST_ARGS=""	# Initialise la chaine des arguments d'installation
-			fi
-			if echo "$LIGNE" | grep -q "^; Checks"; then	# Tests à effectuer
-				MANIFEST=0
-				CHECKS=1
-			fi
-			if [ "$MANIFEST" -eq 1 ]
-			then	# Analyse des arguments du manifest
-				if echo "$LIGNE" | grep -q "="; then
-					if echo "$LIGNE" | grep -q "(DOMAIN)"; then	# Domaine dans le manifest
-						MANIFEST_DOMAIN=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant au domaine
-						LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
-					fi
-					if echo "$LIGNE" | grep -q "(PATH)"; then	# Path dans le manifest
-						MANIFEST_PATH=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant au path
-						LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
-					fi
-					if echo "$LIGNE" | grep -q "(USER)"; then	# User dans le manifest
-						MANIFEST_USER=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant à l'utilisateur
-						LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
-					fi
-					if echo "$LIGNE" | grep -q "(PUBLIC"; then	# Accès public/privé dans le manifest
-						MANIFEST_PUBLIC=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant à l'accès public ou privé
-						MANIFEST_PUBLIC_public=$(echo "$LIGNE" | grep -o "|public=[[:alnum:]]*" | cut -d "=" -f2)	# Récupère la valeur pour un accès public.
-						MANIFEST_PUBLIC_private=$(echo "$LIGNE" | grep -o "|private=[[:alnum:]]*" | cut -d "=" -f2)	# Récupère la valeur pour un accès privé.
-						LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
-					fi
-					if echo "$LIGNE" | grep -q "(PASSWORD)"; then	# Password dans le manifest
-						MANIFEST_PASSWORD=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant au mot de passe
-						LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
-					fi
-					if echo "$LIGNE" | grep -q "(PORT)"; then	# Port dans le manifest
-						MANIFEST_PORT=$(echo "$LIGNE" | cut -d '=' -f1)	# Récupère la clé du manifest correspondant au port
-						LIGNE=$(echo "$LIGNE" | cut -d '(' -f1)	# Retire l'indicateur de clé de manifest à la fin de la ligne
-					fi
-# 					if [ "${#MANIFEST_ARGS}" -gt 0 ]; then	# Si il y a déjà des arguments
-# 						MANIFEST_ARGS="$MANIFEST_ARGS&"	#, précède de &
-# 					fi
-					MANIFEST_ARGS="$MANIFEST_ARGS$(echo $LIGNE | sed 's/^ *\| *$\|\"//g')&"	# Ajoute l'argument du manifest, en retirant les espaces de début et de fin ainsi que les guillemets.
-				fi
-			fi
-			if [ "$CHECKS" -eq 1 ]
-			then	# Analyse des tests à effectuer sur ce scenario.
-				if echo "$LIGNE" | grep -q "^pkg_linter="; then	# Test d'installation en sous-dossier
-					pkg_linter=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$pkg_linter" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^setup_sub_dir="; then	# Test d'installation en sous-dossier
-					setup_sub_dir=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$setup_sub_dir" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^setup_root="; then	# Test d'installation à la racine
-					setup_root=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$setup_root" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^setup_nourl="; then	# Test d'installation sans accès par url
-					setup_nourl=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$setup_nourl" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^setup_private="; then	# Test d'installation en privé
-					setup_private=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$setup_private" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^setup_public="; then	# Test d'installation en public
-					setup_public=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$setup_public" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^upgrade="; then	# Test d'upgrade
-					upgrade=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$upgrade" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^backup_restore="; then	# Test de backup et restore
-					backup_restore=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$backup_restore" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^multi_instance="; then	# Test d'installation multiple
-					multi_instance=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$multi_instance" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^wrong_user="; then	# Test d'erreur d'utilisateur
-					wrong_user=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$wrong_user" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^wrong_path="; then	# Test d'erreur de path ou de domaine
-					wrong_path=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$wrong_path" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^incorrect_path="; then	# Test d'erreur de forme de path
-					incorrect_path=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$incorrect_path" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^corrupt_source="; then	# Test d'erreur sur source corrompue
-					corrupt_source=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$corrupt_source" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^fail_download_source="; then	# Test d'erreur de téléchargement de la source
-					fail_download_source=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$fail_download_source" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^port_already_use="; then	# Test d'erreur de port
-					port_already_use=$(echo "$LIGNE" | cut -d '=' -f2)
-					if echo "$LIGNE" | grep -q "([0-9]*)"
-					then	# Le port est mentionné ici.
-						MANIFEST_PORT="$(echo "$LIGNE" | cut -d '(' -f2 | cut -d ')' -f1)"	# Récupère le numéro du port; Le numéro de port est précédé de # pour indiquer son absence du manifest.
-						port_already_use=${port_already_use:0:1}	# Garde uniquement la valeur de port_already_use
-					fi
-					if [ "$port_already_use" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-				if echo "$LIGNE" | grep -q "^final_path_already_use="; then	# Test sur final path déjà utilisé.
-					final_path_already_use=$(echo "$LIGNE" | cut -d '=' -f2)
-					if [ "$final_path_already_use" -eq 1 ]; then
-						all_test=$((all_test+1))
-					fi
-				fi
-			fi
-		fi
-	done 4< "$APP_CHECK/check_process"	# Utilise le descripteur de fichier 4. Car le descripteur 1 est utilisé par d'autres boucles while read dans ces scripts.
-else	# Si le fichier check_process n'a pas été trouvé, fonctionne en mode dégradé.
-	python "$script_dir/sub_scripts/ci/maniackc.py" "$APP_CHECK/manifest.json" > "$script_dir/manifest_extract" # Extrait les infos du manifest avec le script de Bram
-	pkg_linter=1
-	setup_sub_dir=1
-	setup_root=1
-	upgrade=1
-	backup_restore=1
-	multi_instance=1
-	wrong_user=1
-	wrong_path=1
-	incorrect_path=1
-	all_test=$((all_test+9))
-	while read LIGNE
-	do
-		if echo "$LIGNE" | grep -q ":ynh.local"; then
-			MANIFEST_DOMAIN=$(echo "$LIGNE" | grep ":ynh.local" | cut -d ':' -f1)	# Garde uniquement le nom de la clé.
-		fi
-		if echo "$LIGNE" | grep -q "path:"; then
-			MANIFEST_PATH=$(echo "$LIGNE" | grep "path:" | cut -d ':' -f1)	# Garde uniquement le nom de la clé.
-		fi
-		if echo "$LIGNE" | grep -q "user:\|admin:"; then
-			MANIFEST_USER=$(echo "$LIGNE" | grep "user:\|admin:" | cut -d ':' -f1)	# Garde uniquement le nom de la clé.
-		fi
-		MANIFEST_ARGS="$MANIFEST_ARGS$(echo "$LIGNE" | cut -d ':' -f1,2 | sed s/:/=/)&"	# Ajoute l'argument du manifest
-	done < "$script_dir/manifest_extract"
-	if [ "$MANIFEST_DOMAIN" == "null" ]
-	then
-		ECHO_FORMAT "La clé de manifest du domaine n'a pas été trouvée.\n" "lyellow"
-		setup_sub_dir=0
-		setup_root=0
-		multi_instance=0
-		wrong_user=0
-		incorrect_path=0
-		all_test=$((all_test-5))
-	fi
-	if [ "$MANIFEST_PATH" == "null" ]
-	then
-		ECHO_FORMAT "La clé de manifest du path n'a pas été trouvée.\n" "lyellow"
-		setup_root=0
-		multi_instance=0
-		incorrect_path=0
-		all_test=$((all_test-3))
-	fi
-	if [ "$MANIFEST_USER" == "null" ]
-	then
-		ECHO_FORMAT "La clé de manifest de l'user admin n'a pas été trouvée.\n" "lyellow"
-		wrong_user=0
-		all_test=$((all_test-1))
-	fi
-	if grep multi_instance "$APP_CHECK/manifest.json" | grep -q false
-	then	# Retire le test multi instance si la clé du manifest est à false
-		multi_instance=0
-	fi
-fi
-
-TESTING_PROCESS
-if [ "$no_lxc" -eq 0 ]; then
-	LXC_TURNOFF
-fi
-TEST_RESULTS
 
 # Mail et bot xmpp pour le niveau de l'app
 if [ "$level" -eq 0 ]
