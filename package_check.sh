@@ -121,8 +121,8 @@ _process_lock_file() {
   echo "$script_dir/pcheck.lock"
 }
 
+# FIXME: update me
 _package_check_repo() {
-  # FIXME
   # echo "https://github.com/YunoHost/package_check"
   echo "https://github.com/dapuro/package_check"
 }
@@ -197,9 +197,26 @@ _lxc_boot_log_file() {
   echo "$script_dir/lxc_boot.log"
 }
 
+_debug_output_file() {
+  echo "$OUTPUTD"
+}
+
+_url_output_file() {
+  echo "$script_dir/url_output"
+} 
+
+_curl_print_file() {
+  echo "$script_dir/curl_print"
+} 
+
 _manifest_extract_file() {
   echo "$script_dir/manifest_extract"
 }
+
+_temp_result_file() {
+  echo $temp_RESULT
+}
+
 _ci_python_script_file() {
   echo "$script_dir/sub_scripts/ci/maniackc.py"
 }
@@ -1102,6 +1119,25 @@ notify_via_mail() {
   fi
 }
 
+clean_up() {
+  local -r test_app_dir=$( _test_app_dir )
+
+  local -r files_to_remove=($(_debug_output_file) $(_url_output_file) $(_curl_print_file) $(_manifest_extract_file) $(_temp_result_file))
+  local file=""
+
+  for file in "${files_to_remove[@]}"; do
+    if [[ $file != "/" ]]; then
+      rm --force $file
+    fi
+  done
+
+  if [[ -n $test_app_dir && $test_app_dir != "/" ]]; then
+    sudo rm --recursive --force "$test_app_dir"
+  fi
+
+  _remove_process_lock
+}
+
 main() {
   parse_options_and_arguments
   set_script_dir
@@ -1194,17 +1230,11 @@ main() {
 
   notify_via_mail $message $level
 
+  echo "The complete log of installations and deletions is available in the file $( _complete_log_file )"
+
+  clean_up
 }
 
 main
 
 ### REFACTORED END ###
-
-echo "Le log complet des installations et suppressions est disponible dans le fichier $COMPLETE_LOG"
-# Clean
-rm -f "$OUTPUTD" "$temp_RESULT" "$script_dir/url_output" "$script_dir/curl_print" "$script_dir/manifest_extract"
-
-if [ -n "$APP_CHECK" ]; then
-	sudo rm -rf "$APP_CHECK"
-fi
-sudo rm "$script_dir/pcheck.lock" # Retire le lock
