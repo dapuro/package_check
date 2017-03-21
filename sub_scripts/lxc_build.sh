@@ -24,7 +24,6 @@ test -n "$YUNO_PWD" || YUNO_PWD=admin
 test -n "$LXC_NAME" || LXC_NAME=pchecker_lxc
 test -n "$LXC_BRIDGE" || LXC_BRIDGE=lxc-pchecker
 test -n "$dnsforce" || dnsforce=0
-ARG_SSH="-t"
 
 # Tente de définir l'interface réseau principale
 if [ -z $main_iface ]	# Si main_iface est vide, tente de le trouver.

@@ -95,6 +95,8 @@ final_path_already_use=0
 
 BACKUP_HOOKS="conf_ssowat data_home conf_ynh_firewall conf_cron"	# La liste des hooks disponible pour le backup se trouve dans /usr/share/yunohost/hooks/backup/
 
+ARG_SSH="-t" # force pseudoterm allocation
+
 # HELPER FUNCTIONS
 
 file_exists() {

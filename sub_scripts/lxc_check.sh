@@ -6,7 +6,6 @@
 # Récupère le dossier du script
 if [ "${0:0:1}" == "/" ]; then script_dir="$(dirname "$0")"; else script_dir="$(echo $PWD/$(dirname "$0" | cut -d '.' -f2) | sed 's@/$@@')"; fi
 
-ARG_SSH="-t"
 # Récupère les informations depuis le fichier de conf (Ou le complète le cas échéant)
 pcheck_config="$script_dir/../config"
 # Tente de lire les informations depuis le fichier de config si il existe

@@ -1,6 +1,5 @@
 #!/bin/bash
 
-ARG_SSH="-t"
 # PLAGE_IP=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep PLAGE_IP= | cut -d '"' -f2)
 # LXC_BRIDGE=$(cat "$script_dir/sub_scripts/lxc_build.sh" | grep LXC_BRIDGE= | cut -d '=' -f2)
 # main_iface=$(cat "$script_dir/config" | grep iface= | cut -d '=' -f2)
