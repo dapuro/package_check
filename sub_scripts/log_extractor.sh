@@ -35,6 +35,7 @@ ECHO_FORMAT () {
 	echo -en "\e[0m"
 }
 
+# Depends on globale variables: $YUNOHOST_LOG, $log_line
 COPY_LOG () {
   local -r debug_output_file=$( _debug_output_file )
 	if [ "$1" -eq 1 ]; then
@@ -47,7 +48,8 @@ COPY_LOG () {
 	fi
 }
 
-PARSE_LOG () {
+# Depends on global variables: $YUNOHOST_RESULT, $YUNOHOST_REMOVE
+_parse_log () {
   local -r temp_result_file=$( _temp_result_file )
 
 	while read LOG_LIGNE_TEMP
@@ -65,7 +67,7 @@ PARSE_LOG () {
 	done < "$temp_result_file"
 }
 
-CLEAR_LOG () {
+_clear_log () {
   local -r temp_result_file=$( _temp_result_file )
 
 	# Élimine les warning parasites connus et identifiables facilement.
@@ -100,6 +102,7 @@ LOG_EXTRACTOR () {
 			echo "$LOG_LIGNE" | sed 's/^.* WARNING *//' >> "$temp_result_file"
 		fi
 	done < "$debug_output_file"
-	CLEAR_LOG
-	PARSE_LOG
+
+	_clear_log
+	_parse_log
 }
