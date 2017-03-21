@@ -198,7 +198,7 @@ _lxc_boot_log_file() {
 }
 
 _debug_output_file() {
-  echo "$OUTPUTD"
+  echo "$script_dir/debug_output.log"
 }
 
 _url_output_file() {
@@ -921,6 +921,7 @@ main() {
   ensure_user_can_execute_sript
 
   source "$script_dir/sub_scripts/lxc_launcher.sh"
+  source "$script_dir/sub_scripts/log_extractor.sh"
   source "$script_dir/sub_scripts/testing_process.sh"
   source /usr/share/yunohost/helpers
   source "$script_dir/lib/result_rendering.sh"

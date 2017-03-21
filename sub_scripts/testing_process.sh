@@ -8,6 +8,7 @@ echo -e "Chargement des fonctions de testing_process.sh"
 source "$script_dir/sub_scripts/log_extractor.sh"
 
 SETUP_APP () {
+  local -r debug_output_file=$( _debug_output_file )
 # echo -e "MANIFEST_ARGS=$MANIFEST_ARGS"
 # echo -e "MANIFEST_ARGS_MOD=$MANIFEST_ARGS_MOD"
 	COPY_LOG 1
@@ -19,7 +20,7 @@ SETUP_APP () {
 		ECHO_FORMAT "Installation échouée. ($YUNOHOST_RESULT)\n" "white" clog
 	fi
 	COPY_LOG 2
-	APPID=$(grep -o -m1 "YNH_APP_INSTANCE_NAME=[^ ]*" "$OUTPUTD" | cut -d '=' -f2)	# Récupère le nom de l'app au moment de l'install. Pour pouvoir le réutiliser dans les commandes yunohost. La regex matche tout ce qui suit le =, jusqu'à l'espace.
+	APPID=$(grep -o -m1 "YNH_APP_INSTANCE_NAME=[^ ]*" "$debug_output_file" | cut -d '=' -f2)	# Récupère le nom de l'app au moment de l'install. Pour pouvoir le réutiliser dans les commandes yunohost. La regex matche tout ce qui suit le =, jusqu'à l'espace.
 }
 
 REMOVE_APP () {

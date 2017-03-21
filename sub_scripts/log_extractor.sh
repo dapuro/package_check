@@ -1,6 +1,5 @@
 #!/bin/bash
 
-OUTPUTD="$script_dir/debug_output.log"
 YUNOHOST_LOG="/var/log/yunohost/yunohost-cli.log"
 COMPLETE_LOG="$script_dir/Complete.log"
 temp_RESULT="$script_dir/temp_result.log"
@@ -38,13 +37,14 @@ ECHO_FORMAT () {
 }
 
 COPY_LOG () {
+  local -r debug_output_file=$( _debug_output_file )
 	if [ "$1" -eq 1 ]; then
 		log_line=$(sudo wc -l "$YUNOHOST_LOG" | cut -d ' ' -f 1)	# Compte le nombre de ligne du fichier de log Yunohost
 		log_line=$(( $log_line + 1 ))	# Ignore la première ligne, reprise de l'ancien log.
-		echo -n "" > "$OUTPUTD"	# Efface le fichier de log temporaire
+		echo -n "" > "$debug_output_file"	# Efface le fichier de log temporaire
 	fi
 	if [ "$1" -eq 2 ]; then
-		sudo tail -n +$log_line "$YUNOHOST_LOG" >> "$OUTPUTD"	# Copie le fichier de log à partir de la dernière ligne du log préexistant
+		sudo tail -n +$log_line "$YUNOHOST_LOG" >> "$debug_output_file"	# Copie le fichier de log à partir de la dernière ligne du log préexistant
 	fi
 }
 
@@ -76,8 +76,9 @@ CLEAR_LOG () {
 }
 
 LOG_EXTRACTOR () {
+  local -r debug_output_file=$( _debug_output_file )
 	echo -n "" > "$temp_RESULT"	# Initialise le fichier des résulats d'analyse
-	cat "$OUTPUTD" >> "$COMPLETE_LOG"
+	cat "$debug_output_file" >> "$COMPLETE_LOG"
 	while read LOG_LIGNE
 	do	# Lit le log pour extraire les warning et les erreurs.
 		if echo "$LOG_LIGNE" | grep -q " ERROR    "; then
@@ -93,7 +94,7 @@ LOG_EXTRACTOR () {
 			echo -n ">WARNING: " >> "$temp_RESULT"
 			echo "$LOG_LIGNE" | sed 's/^.* WARNING *//' >> "$temp_RESULT"
 		fi
-	done < "$OUTPUTD"
+	done < "$debug_output_file"
 	CLEAR_LOG
 	PARSE_LOG
 }

@@ -23,6 +23,7 @@ LXC_INIT () {
 }
 
 LXC_START () {
+  local -r debug_output_file=$( _debug_output_file )
 	if [ "$no_lxc" -eq 0 ]
 	then
 		for i in `seq 1 3`
@@ -68,10 +69,10 @@ LXC_START () {
 		scp -rq "$APP_CHECK" "$LXC_NAME": >> "$RESULT" 2>&1
 		ssh $ARG_SSH $LXC_NAME "$1 > /dev/null 2>> debug_output.log; exit \$?" >> "$RESULT" 2>&1	# Exécute la commande dans la machine LXC
 		returncode=$?
-		sudo cat "/var/lib/lxc/$LXC_NAME/rootfs/home/pchecker/debug_output.log" >> "$OUTPUTD" # Récupère le contenu du OUTPUTD distant pour le réinjecter dans le local
+		sudo cat "/var/lib/lxc/$LXC_NAME/rootfs/home/pchecker/debug_output.log" >> "$debug_output_file" # Récupère le contenu du debug_output_file distant pour le réinjecter dans le local
 		return $returncode
 	else	# Sinon exécute la commande directement.
-		eval "$1" > /dev/null 2>> "$OUTPUTD"
+		eval "$1" > /dev/null 2>> "$debug_output_file"
 	fi
 }
 
