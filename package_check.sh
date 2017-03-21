@@ -214,7 +214,7 @@ _manifest_extract_file() {
 }
 
 _temp_result_file() {
-  echo $temp_RESULT
+  echo "$script_dir/temp_result.log"
 }
 
 _ci_python_script_file() {

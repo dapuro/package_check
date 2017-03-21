@@ -2,7 +2,6 @@
 
 YUNOHOST_LOG="/var/log/yunohost/yunohost-cli.log"
 COMPLETE_LOG="$script_dir/Complete.log"
-temp_RESULT="$script_dir/temp_result.log"
 
 echo "Chargement des fonctions de log_extractor.sh"
 
@@ -49,6 +48,8 @@ COPY_LOG () {
 }
 
 PARSE_LOG () {
+  local -r temp_result_file=$( _temp_result_file )
+
 	while read LOG_LIGNE_TEMP
 	do	# Lit le log pour extraire les warning et les erreurs.
 		if echo "$LOG_LIGNE_TEMP" | grep -q "^>ERROR: "; then
@@ -61,38 +62,42 @@ PARSE_LOG () {
 			ECHO_FORMAT "Warning:" "lyellow" "underlined"
 			ECHO_FORMAT " $(echo "$LOG_LIGNE_TEMP\n" | sed 's/^>WARNING: //')" "lyellow"
 		fi
-	done < "$temp_RESULT"
+	done < "$temp_result_file"
 }
 
 CLEAR_LOG () {
+  local -r temp_result_file=$( _temp_result_file )
+
 	# Élimine les warning parasites connus et identifiables facilement.
-	sed -i '/^>WARNING: yunohost\.hook <lambda> - \[[[:digit:].]*\] *$/d' "$temp_RESULT"	# Ligne de warning vide précédant et suivant la progression d'un wget
-	sed -i '/^>WARNING: yunohost\.hook <lambda> - \[[[:digit:].]*\] *[[:digit:]]*K \.* /d' "$temp_RESULT"	# Ligne de warning de progression d'un wget
-	sed -i '/% Total    % Received % Xferd/d' "$temp_RESULT"	# Ligne de warning des statistiques d'un wget
-	sed -i '/Dload  Upload   Total   Spent/d' "$temp_RESULT"	# 2e ligne de warning des statistiques d'un wget
-	sed -i '/--:--:-- --:--:-- --:--:--/d' "$temp_RESULT"	# 3e ligne de warning des statistiques d'un wget
-	sed -i '/^>WARNING: yunohost.backup backup_restore - \[[[:digit:].]*\] YunoHost est déjà installé$/d' "$temp_RESULT"	# Ligne de warning du backup car Yunohost est déjà installé
-	sed -i '/^$/d' "$temp_RESULT"	# Retire les lignes vides
+	sed -i '/^>WARNING: yunohost\.hook <lambda> - \[[[:digit:].]*\] *$/d' "$temp_result_file"	# Ligne de warning vide précédant et suivant la progression d'un wget
+	sed -i '/^>WARNING: yunohost\.hook <lambda> - \[[[:digit:].]*\] *[[:digit:]]*K \.* /d' "$temp_result_file"	# Ligne de warning de progression d'un wget
+	sed -i '/% Total    % Received % Xferd/d' "$temp_result_file"	# Ligne de warning des statistiques d'un wget
+	sed -i '/Dload  Upload   Total   Spent/d' "$temp_result_file"	# 2e ligne de warning des statistiques d'un wget
+	sed -i '/--:--:-- --:--:-- --:--:--/d' "$temp_result_file"	# 3e ligne de warning des statistiques d'un wget
+	sed -i '/^>WARNING: yunohost.backup backup_restore - \[[[:digit:].]*\] YunoHost est déjà installé$/d' "$temp_result_file"	# Ligne de warning du backup car Yunohost est déjà installé
+	sed -i '/^$/d' "$temp_result_file"	# Retire les lignes vides
 }
 
 LOG_EXTRACTOR () {
   local -r debug_output_file=$( _debug_output_file )
-	echo -n "" > "$temp_RESULT"	# Initialise le fichier des résulats d'analyse
+  local -r temp_result_file=$( _temp_result_file )
+
+	echo -n "" > "$temp_result_file"	# Initialise le fichier des résulats d'analyse
 	cat "$debug_output_file" >> "$COMPLETE_LOG"
 	while read LOG_LIGNE
 	do	# Lit le log pour extraire les warning et les erreurs.
 		if echo "$LOG_LIGNE" | grep -q " ERROR    "; then
-			echo -n ">ERROR: " >> "$temp_RESULT"
-			echo "$LOG_LIGNE" | sed 's/^.* ERROR *//' >> "$temp_RESULT"
+			echo -n ">ERROR: " >> "$temp_result_file"
+			echo "$LOG_LIGNE" | sed 's/^.* ERROR *//' >> "$temp_result_file"
 		fi
 		if echo "$LOG_LIGNE" | grep -q "yunohost.*: error:"; then	# Récupère aussi les erreurs de la moulinette
-			echo -n ">ERROR: " >> "$temp_RESULT"
-			echo "$LOG_LIGNE" >> "$temp_RESULT"
+			echo -n ">ERROR: " >> "$temp_result_file"
+			echo "$LOG_LIGNE" >> "$temp_result_file"
 		fi
 
 		if echo "$LOG_LIGNE" | grep -q " WARNING  "; then
-			echo -n ">WARNING: " >> "$temp_RESULT"
-			echo "$LOG_LIGNE" | sed 's/^.* WARNING *//' >> "$temp_RESULT"
+			echo -n ">WARNING: " >> "$temp_result_file"
+			echo "$LOG_LIGNE" | sed 's/^.* WARNING *//' >> "$temp_result_file"
 		fi
 	done < "$debug_output_file"
 	CLEAR_LOG
