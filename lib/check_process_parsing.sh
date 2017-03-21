@@ -31,25 +31,25 @@ _parse_levels() {
   local value=""
   local line=""
 
-	IN_LEVELS=0
-	while read <&4 line; do
-		line=$( _clear_spaces_from_beginning "$line" )
+  IN_LEVELS=0
+  while read <&4 line; do
+    line=$( _clear_spaces_from_beginning "$line" )
 
-		if _line_is_comment $line; then
-			continue
-		fi
+    if _line_is_comment $line; then
+      continue
+    fi
 
     if $( _line_is_levels_section "$line" ); then
-			IN_LEVELS=1
-		fi
+      IN_LEVELS=1
+    fi
 
     if (( $IN_LEVELS == 1 )); then
-			if _line_is_levels_setting "$line"; then
+      if _line_is_levels_setting "$line"; then
         index=$(echo "$line" | cut -d '=' -f1 | cut -d ' ' -f2)
         value=$(echo "$line" | cut -d '=' -f2)
-				level[$index]=$value
-			fi
-		fi
+        level[$index]=$value
+      fi
+    fi
   done 4< $input_file
 }
 
@@ -107,16 +107,16 @@ _get_and_process_checks_value() {
   local -r varname=$2
   local value=""
 
-	if echo "$line" | grep -q "^${varname}="; then
+  if echo "$line" | grep -q "^${varname}="; then
 
     value=$(echo "$line" | cut -d '=' -f2)
 
     # Special Case "port"
     if echo "$line" | grep -q "([0-9]*)"; then	
-    
+
       # FIXME: for some reason assignment doesnt stick?
       # PORTX=66 #"$( echo $line | cut -d '(' -f2 | cut -d ')' -f1)"
-    
+
       value=${value:0:1}
     fi
 
@@ -130,13 +130,6 @@ _get_and_process_checks_value() {
   fi
 }
 
-# Dependsd on global variable: $all_test
-_update_all_test() {
-  local -r arg=$1
-
-}
-
-
 # Depends on global variables: 
 # $auto_remove,  $IN_PROCESS, $bash_mode, 
 # $PROCESS_NAME, $MANIFEST, $CHECKS
@@ -146,8 +139,8 @@ _parse_test_setup() {
   local line=""
   local arg=""
 
-	while read <&4 line; do
-		line=$( _clear_spaces_from_beginning "$line" )
+  while read <&4 line; do
+    line=$( _clear_spaces_from_beginning "$line" )
 
     if _line_is_comment $line; then
       continue
@@ -155,76 +148,76 @@ _parse_test_setup() {
 
     if _line_is_autoremove $line; then
       value=$(echo "$line" | cut -d '=' -f2)
-			auto_remove=$value
+      auto_remove=$value
     fi
 
     if _line_is_test_section "$line"; then
-    
+
       # FIXME: when is this ever the case?
       if [[ $IN_PROCESS -eq 1 ]]; then # A scenario is already underway. So we reached the end of the scenario.
-				TESTING_PROCESS
-				TEST_RESULTS
-				INIT_VAR
-    
-				if [[ "$bash_mode" -ne 1 ]]; then
-					read -p "Press a key to start the next test scenario..." < /dev/tty
-				fi
-			fi
-    
-			PROCESS_NAME=${line#;; }
-			IN_PROCESS=1
-			MANIFEST=0
-			CHECKS=0
-			IN_LEVELS=0
+        TESTING_PROCESS
+        TEST_RESULTS
+        INIT_VAR
+
+        if [[ "$bash_mode" -ne 1 ]]; then
+          read -p "Press a key to start the next test scenario..." < /dev/tty
+        fi
+      fi
+
+      PROCESS_NAME=${line#;; }
+      IN_PROCESS=1
+      MANIFEST=0
+      CHECKS=0
+      IN_LEVELS=0
     fi
 
-		if [ "$IN_PROCESS" -eq 1 ]; then
+    if [ "$IN_PROCESS" -eq 1 ]; then
 
       if _line_is_manifest_section "$line"; then
-				MANIFEST=1
-				MANIFEST_ARGS=""
+        MANIFEST=1
+        MANIFEST_ARGS=""
       fi
 
       if _line_is_checks_section "$line"; then
-				MANIFEST=0
-				CHECKS=1
+        MANIFEST=0
+        CHECKS=1
       fi
 
-			if [[ $MANIFEST -eq 1 ]]; then
+      if [[ $MANIFEST -eq 1 ]]; then
 
         if _line_is_a_setting "$line"; then
 
-					if echo "$line" | grep -q "(DOMAIN)"; then
-						MANIFEST_DOMAIN=$( _get_setting_key "$line" )
-					fi
+          if echo "$line" | grep -q "(DOMAIN)"; then
+            MANIFEST_DOMAIN=$( _get_setting_key "$line" )
+          fi
 
-					if echo "$line" | grep -q "(PATH)"; then
-						MANIFEST_PATH=$( _get_setting_key "$line" )
-					fi
+          if echo "$line" | grep -q "(PATH)"; then
+            MANIFEST_PATH=$( _get_setting_key "$line" )
+          fi
 
-					if echo "$line" | grep -q "(USER)"; then
+          if echo "$line" | grep -q "(USER)"; then
             MANIFEST_USER=$( _get_setting_key $line )					
           fi
 
-					if echo "$line" | grep -q "(PUBLIC"; then	
-						MANIFEST_PUBLIC=$( _get_setting_key $line )
-						MANIFEST_PUBLIC_public=$(echo "$line" | grep -o "|public=[[:alnum:]]*" | cut -d "=" -f2)
-						MANIFEST_PUBLIC_private=$(echo "$line" | grep -o "|private=[[:alnum:]]*" | cut -d "=" -f2)
-					fi
+          if echo "$line" | grep -q "(PUBLIC"; then	
+            MANIFEST_PUBLIC=$( _get_setting_key $line )
+            MANIFEST_PUBLIC_public=$(echo "$line" | grep -o "|public=[[:alnum:]]*" | cut -d "=" -f2)
+            MANIFEST_PUBLIC_private=$(echo "$line" | grep -o "|private=[[:alnum:]]*" | cut -d "=" -f2)
+          fi
 
-					if echo "$line" | grep -q "(PASSWORD)"; then
-						MANIFEST_PASSWORD=$( _get_setting_key $line )
-					fi
+          if echo "$line" | grep -q "(PASSWORD)"; then
+            MANIFEST_PASSWORD=$( _get_setting_key $line )
+          fi
 
-					if echo "$line" | grep -q "(PORT)"; then
-						MANIFEST_PORT=$( _get_setting_key $line )
-					fi
+          if echo "$line" | grep -q "(PORT)"; then
+            MANIFEST_PORT=$( _get_setting_key $line )
+          fi
 
           line=$( _remove_setting_indicator $line )
 
           arg=$( _remove_whitspace_and_quotes $line )
 
-					MANIFEST_ARGS="$MANIFEST_ARGS$arg&"
+          MANIFEST_ARGS="$MANIFEST_ARGS$arg&"
         fi
       fi
 
