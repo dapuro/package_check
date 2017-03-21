@@ -93,6 +93,8 @@ fail_download_source=0
 port_already_use=0
 final_path_already_use=0
 
+BACKUP_HOOKS="conf_ssowat data_home conf_ynh_firewall conf_cron"	# La liste des hooks disponible pour le backup se trouve dans /usr/share/yunohost/hooks/backup/
+
 # HELPER FUNCTIONS
 
 file_exists() {

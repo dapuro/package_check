@@ -1,7 +1,5 @@
 #!/bin/bash
 
-BACKUP_HOOKS="conf_ssowat data_home conf_ynh_firewall conf_cron"	# La liste des hooks disponible pour le backup se trouve dans /usr/share/yunohost/hooks/backup/
-
 echo -e "Chargement des fonctions de testing_process.sh"
 
 source "$script_dir/sub_scripts/log_extractor.sh"
