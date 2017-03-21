@@ -1,3 +1,8 @@
 *.swp
 *~
 Notes
+*.log
+package_linter
+package_version
+plinter_version
+config
