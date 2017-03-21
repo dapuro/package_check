@@ -1,6 +1,5 @@
 #!/bin/bash
 
-RESULT="$script_dir/Test_results.log"
 BACKUP_HOOKS="conf_ssowat data_home conf_ynh_firewall conf_cron"	# La liste des hooks disponible pour le backup se trouve dans /usr/share/yunohost/hooks/backup/
 
 echo -e "Chargement des fonctions de testing_process.sh"
@@ -43,6 +42,8 @@ REMOVE_APP () {
 }
 
 CHECK_URL () {
+  local -r test_results_log_file=$( _test_results_log_file )
+
 	if [ "$use_curl" -eq 1 ]
 	then
 		ECHO_FORMAT "\nAccès par l'url...\n" "white" "bold"
@@ -135,7 +136,7 @@ CHECK_URL () {
 				fi
 				ECHO_FORMAT "Extrait du corps de la page:\n" "white"
 				echo -e "\e[37m"	# Écrit en light grey
-				grep "<body" -A 20 "$script_dir/url_output" | sed 1d | tee -a "$RESULT"
+				grep "<body" -A 20 "$script_dir/url_output" | sed 1d | tee -a "$test_results_log_file"
 				echo -e "\e[0m"
 			fi
 		done

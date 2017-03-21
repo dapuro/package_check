@@ -8,14 +8,16 @@ ARG_SSH="-t"
 echo -e "Chargement des fonctions de lxc_launcher.sh"
 
 LXC_INIT () {
+  local -r test_results_log_file=$( _test_results_log_file )
+
 	# Activation du bridge réseau
 	echo "Initialisation du réseau pour le conteneur."
-	sudo ifup $LXC_BRIDGE --interfaces=/etc/network/interfaces.d/$LXC_BRIDGE | tee -a "$RESULT" 2>&1
+	sudo ifup $LXC_BRIDGE --interfaces=/etc/network/interfaces.d/$LXC_BRIDGE | tee -a "$test_results_log_file" 2>&1
 
 	# Activation des règles iptables
-	sudo iptables -A FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT | tee -a "$RESULT" 2>&1
-	sudo iptables -A FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT | tee -a "$RESULT" 2>&1
-	sudo iptables -t nat -A POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE | tee -a "$RESULT" 2>&1
+	sudo iptables -A FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT | tee -a "$test_results_log_file" 2>&1
+	sudo iptables -A FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT | tee -a "$test_results_log_file" 2>&1
+	sudo iptables -t nat -A POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE | tee -a "$test_results_log_file" 2>&1
 
 	if [ "$no_lxc" -eq 0 ]; then
 		YUNOHOST_LOG=/var/lib/lxc/$LXC_NAME/rootfs$YUNOHOST_LOG	#Prend le log de la machine lxc plutôt que celui de l'hôte
@@ -24,13 +26,13 @@ LXC_INIT () {
 
 LXC_START () {
   local -r debug_output_file=$( _debug_output_file )
+  local -r test_results_log_file=$( _test_results_log_file )
+
 	if [ "$no_lxc" -eq 0 ]
 	then
-		for i in `seq 1 3`
-		do	# Tente jusqu'à 3 fois de démarrer le conteneur
 			# Démarrage de la machine
 			if sudo lxc-info --name $LXC_NAME | grep -q "STOPPED"; then
-				sudo lxc-start -n $LXC_NAME -d --logfile "$script_dir/lxc_boot.log" | tee -a "$RESULT" 2>&1
+				sudo lxc-start -n $LXC_NAME -d --logfile "$script_dir/lxc_boot.log" | tee -a "$test_results_log_file" 2>&1
 			fi
 			for j in `seq 1 10`
 			do	# Vérifie que la machine est accessible en ssh avant de commencer. Il lui faut le temps de démarrer.
@@ -66,8 +68,8 @@ LXC_START () {
 				return 1
 			fi
 		done
-		scp -rq "$APP_CHECK" "$LXC_NAME": >> "$RESULT" 2>&1
-		ssh $ARG_SSH $LXC_NAME "$1 > /dev/null 2>> debug_output.log; exit \$?" >> "$RESULT" 2>&1	# Exécute la commande dans la machine LXC
+		scp -rq "$APP_CHECK" "$LXC_NAME": >> "$test_results_log_file" 2>&1
+		ssh $ARG_SSH $LXC_NAME "$1 > /dev/null 2>> debug_output.log; exit \$?" >> "$test_results_log_file" 2>&1	# Exécute la commande dans la machine LXC
 		returncode=$?
 		sudo cat "/var/lib/lxc/$LXC_NAME/rootfs/home/pchecker/debug_output.log" >> "$debug_output_file" # Récupère le contenu du debug_output_file distant pour le réinjecter dans le local
 		return $returncode
@@ -77,15 +79,17 @@ LXC_START () {
 }
 
 LXC_STOP () {
+  local -r test_results_log_file=$( _test_results_log_file )
+
 	if [ "$no_lxc" -eq 0 ]
 	then
 		# Arrêt de la machine virtualisée
 		if [ $(sudo lxc-info --name $LXC_NAME | grep -c "STOPPED") -eq 0 ]; then
-			echo "Arrêt du conteneur LXC" | tee -a "$RESULT"
-			sudo lxc-stop -n $LXC_NAME | tee -a "$RESULT" 2>&1
+			echo "Arrêt du conteneur LXC" | tee -a "$test_results_log_file"
+			sudo lxc-stop -n $LXC_NAME | tee -a "$test_results_log_file" 2>&1
 		fi
 		# Restaure le snapshot.
-		echo "Restauration du snapshot de la machine lxc" | tee -a "$RESULT"
+		echo "Restauration du snapshot de la machine lxc" | tee -a "$test_results_log_file"
 		if ! sudo grep -q "$LXC_NAME" /var/lib/lxcsnaps/$LXC_NAME/snap0/rootfs/etc/hosts
 		then	# Si le nom de la machine n'est pas dans le hosts
 			if sudo grep -q "snap0" /var/lib/lxcsnaps/$LXC_NAME/snap0/rootfs/etc/hosts
@@ -95,29 +99,31 @@ LXC_STOP () {
 				echo "$LXC_NAME" | sudo tee -a /var/lib/lxcsnaps/$LXC_NAME/snap0/rootfs/etc/hosts > /dev/null
 			fi
 		fi
-		sudo rsync -aEAX --delete -i /var/lib/lxcsnaps/$LXC_NAME/snap0/rootfs/ /var/lib/lxc/$LXC_NAME/rootfs/ > /dev/null 2>> "$RESULT"
+		sudo rsync -aEAX --delete -i /var/lib/lxcsnaps/$LXC_NAME/snap0/rootfs/ /var/lib/lxc/$LXC_NAME/rootfs/ > /dev/null 2>> "$test_results_log_file"
 	fi
 }
 
 LXC_TURNOFF () {
+  local -r test_results_log_file=$( _test_results_log_file )
+
 	echo "Arrêt du réseau pour le conteneur."
 	# Suppression des règles de parefeu
 	if sudo iptables -C FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT 2> /dev/null
 	then
-		sudo iptables -D FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT >> "$RESULT" 2>&1
+		sudo iptables -D FORWARD -i $LXC_BRIDGE -o $main_iface -j ACCEPT >> "$test_results_log_file" 2>&1
 	fi
 	if sudo iptables -C FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT 2> /dev/null
 	then
-		sudo iptables -D FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT | tee -a "$RESULT" 2>&1
+		sudo iptables -D FORWARD -i $main_iface -o $LXC_BRIDGE -j ACCEPT | tee -a "$test_results_log_file" 2>&1
 	fi
 	if sudo iptables -t nat -C POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE 2> /dev/null
 	then
-		sudo iptables -t nat -D POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE | tee -a "$RESULT" 2>&1
+		sudo iptables -t nat -D POSTROUTING -s $PLAGE_IP.0/24 -j MASQUERADE | tee -a "$test_results_log_file" 2>&1
 	fi
 	# Et arrêt du bridge
 	if sudo ifquery $LXC_BRIDGE --state > /dev/null
 	then
-		sudo ifdown --force $LXC_BRIDGE | tee -a "$RESULT" 2>&1
+		sudo ifdown --force $LXC_BRIDGE | tee -a "$test_results_log_file" 2>&1
 	fi
 }
 

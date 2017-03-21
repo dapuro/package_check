@@ -190,7 +190,7 @@ _complete_log_file() {
 }
 
 _test_results_log_file() {
-  echo "$RESULT"
+  echo "$script_dir/Test_results.log"
 }
 
 _lxc_boot_log_file() {

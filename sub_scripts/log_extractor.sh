@@ -6,6 +6,8 @@ COMPLETE_LOG="$script_dir/Complete.log"
 echo "Chargement des fonctions de log_extractor.sh"
 
 ECHO_FORMAT () {
+  local -r test_results_log_file=$( _test_results_log_file )
+
 	if [ "$2" == "red" ]; then
 		echo -en "\e[91m"
 	fi
@@ -31,7 +33,7 @@ ECHO_FORMAT () {
 	if [ "$2" == "clog" ] || [ "$3" == "clog" ] || [ "$4" == "clog" ]; then
  		copy_log="$COMPLETE_LOG"
 	fi
-	echo -en "$1" | tee -a "$RESULT" "$copy_log"
+	echo -en "$1" | tee -a "$test_results_log_file" "$copy_log"
 	echo -en "\e[0m"
 }
 
