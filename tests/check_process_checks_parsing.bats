@@ -75,7 +75,7 @@ teardown() {
   [[ $corrupt_source == 1 ]]
   [[ $fail_download_source == 1 ]]
   [[ $final_path_already_use == 1 ]]
-  [[ $port_already_use == 0 ]]
+  [[ $port_already_use == 1 ]]
 
   # [[ $PORTX == 66 ]]
 }

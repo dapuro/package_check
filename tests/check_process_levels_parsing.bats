@@ -5,7 +5,7 @@ source "../lib/check_process_parsing.sh"
 setup() {
   declare -A level
 
-  INPUT_FILE="./check_process"
+  INPUT_FILE="../fixtures/check_process"
 }
 
 teardown() {
